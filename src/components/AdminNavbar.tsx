@@ -24,7 +24,7 @@ const AdminNavbar = () => {
   ];
 
   return (
-    <nav className="bg-white shadow-sm border-b border-emerald-100">
+    <nav className="sticky top-0 z-50 bg-white shadow-sm border-b border-emerald-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center space-x-8 space-x-reverse">
@@ -63,7 +63,7 @@ const AdminNavbar = () => {
                       <Menu className="w-4 h-4" />
                     </Button>
                   </SheetTrigger>
-                  <SheetContent side="right" className="w-[300px] sm:w-[400px]">
+                  <SheetContent side="right" className="w-[85vw] sm:w-[400px]">
                     <div className="flex flex-col gap-4 mt-8">
                       {navItems.map((item) => {
                         const Icon = item.icon;
