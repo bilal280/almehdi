@@ -23,6 +23,9 @@ interface StudentMonthlyRecord {
 const StudentRecords = () => {
   const [selectedView, setSelectedView] = useState<'weekly' | 'monthly' | 'quarterly'>('weekly');
   const [selectedMonth, setSelectedMonth] = useState<string>(new Date().getMonth().toString());
+  const [selectedYear, setSelectedYear] = useState<string>(new Date().getFullYear().toString());
+  const [availableMonths, setAvailableMonths] = useState<{value: string, label: string}[]>([]);
+  const [availableYears, setAvailableYears] = useState<string[]>([]);
   const [records, setRecords] = useState<StudentMonthlyRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
@@ -43,8 +46,91 @@ const StudentRecords = () => {
   ];
 
   useEffect(() => {
+    fetchAvailableMonthsAndYears();
+  }, []);
+
+  useEffect(() => {
     fetchRecords();
-  }, [selectedView, selectedMonth]);
+  }, [selectedView, selectedMonth, selectedYear]);
+
+  const fetchAvailableMonthsAndYears = async () => {
+    try {
+      const teacherData = localStorage.getItem('teacher');
+      if (!teacherData) return;
+      
+      const teacher = JSON.parse(teacherData);
+
+      // جلب الحلقات
+      const { data: circles } = await supabase
+        .from('circles')
+        .select('id')
+        .eq('teacher_id', teacher.id);
+
+      const circleIds = circles?.map(c => c.id) || [];
+      if (circleIds.length === 0) return;
+
+      // جلب الطلاب
+      const { data: students } = await supabase
+        .from('students')
+        .select('id')
+        .in('circle_id', circleIds);
+
+      const studentIds = students?.map(s => s.id) || [];
+      if (studentIds.length === 0) return;
+
+      // جلب التواريخ من الأعمال اليومية
+      const { data: workDates } = await supabase
+        .from('student_daily_work')
+        .select('date')
+        .in('student_id', studentIds);
+
+      // جلب التواريخ من الحضور
+      const { data: attendanceDates } = await supabase
+        .from('student_attendance')
+        .select('date')
+        .in('student_id', studentIds);
+
+      // دمج التواريخ
+      const allDates = [
+        ...(workDates?.map(d => d.date) || []),
+        ...(attendanceDates?.map(d => d.date) || [])
+      ];
+
+      // استخراج الأشهر والسنوات الفريدة
+      const monthYearSet = new Set<string>();
+      const yearSet = new Set<string>();
+
+      allDates.forEach(dateStr => {
+        const date = new Date(dateStr);
+        const month = date.getMonth();
+        const year = date.getFullYear();
+        monthYearSet.add(`${year}-${month}`);
+        yearSet.add(year.toString());
+      });
+
+      // تحويل إلى مصفوفات
+      const years = Array.from(yearSet).sort((a, b) => parseInt(b) - parseInt(a));
+      setAvailableYears(years);
+
+      // تصفية الأشهر حسب السنة المختارة
+      updateAvailableMonths(monthYearSet, selectedYear);
+
+    } catch (error) {
+      console.error('Error fetching available months:', error);
+    }
+  };
+
+  const updateAvailableMonths = (monthYearSet: Set<string>, year: string) => {
+    const monthsForYear = months.filter(m => 
+      monthYearSet.has(`${year}-${m.value}`)
+    );
+    setAvailableMonths(monthsForYear);
+    
+    // إذا كان الشهر المختار غير موجود في القائمة، اختر أول شهر متاح
+    if (monthsForYear.length > 0 && !monthsForYear.find(m => m.value === selectedMonth)) {
+      setSelectedMonth(monthsForYear[0].value);
+    }
+  };
 
   const fetchRecords = async () => {
     setLoading(true);
@@ -172,6 +258,10 @@ const StudentRecords = () => {
   };
 
   const fetchMonthlyRecords = async (teacherId: string, startDate: Date, endDate: Date) => {
+    // تحديث السنة والشهر في startDate و endDate
+    startDate.setFullYear(parseInt(selectedYear));
+    endDate.setFullYear(parseInt(selectedYear));
+    
     const startDateStr = startDate.toISOString().split('T')[0];
     const endDateStr = endDate.toISOString().split('T')[0];
 
@@ -390,23 +480,44 @@ const StudentRecords = () => {
           </div>
 
           {(selectedView === 'monthly' || selectedView === 'quarterly') && (
-            <div className="mb-6 flex items-center gap-4">
+            <div className="mb-6 flex items-center gap-4 flex-wrap">
               <Calendar className="w-5 h-5 text-primary" />
+              
+              <Select value={selectedYear} onValueChange={setSelectedYear}>
+                <SelectTrigger className="w-[150px]">
+                  <SelectValue placeholder="اختر السنة" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableYears.map(year => (
+                    <SelectItem key={year} value={year}>
+                      {year}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
               <Select value={selectedMonth} onValueChange={setSelectedMonth}>
                 <SelectTrigger className="w-[200px]">
                   <SelectValue placeholder="اختر الشهر" />
                 </SelectTrigger>
                 <SelectContent>
-                  {months.map(month => (
-                    <SelectItem key={month.value} value={month.value}>
-                      {month.label}
+                  {availableMonths.length > 0 ? (
+                    availableMonths.map(month => (
+                      <SelectItem key={month.value} value={month.value}>
+                        {month.label}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="none" disabled>
+                      لا توجد بيانات لهذه السنة
                     </SelectItem>
-                  ))}
+                  )}
                 </SelectContent>
               </Select>
+              
               {selectedView === 'quarterly' && (
                 <p className="text-sm text-muted-foreground">
-                  (الفصل يبدأ من {months[parseInt(selectedMonth)].label} ويستمر 4 أشهر)
+                  (الفصل يبدأ من {months[parseInt(selectedMonth)]?.label} ويستمر 4 أشهر)
                 </p>
               )}
             </div>

@@ -1,34 +1,101 @@
+import { useState, useEffect } from "react";
 import AdminNavbar from "@/components/AdminNavbar";
 import ProtectedAdminRoute from "@/components/ProtectedAdminRoute";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, UserCheck, BookOpen, TrendingUp } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 const AdminDashboard = () => {
+  const [totalStudents, setTotalStudents] = useState<number>(0);
+  const [totalTeachers, setTotalTeachers] = useState<number>(0);
+  const [totalCircles, setTotalCircles] = useState<number>(0);
+  const [attendanceRate, setAttendanceRate] = useState<string>("0%");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchStats();
+  }, []);
+
+  const fetchStats = async () => {
+    try {
+      setLoading(true);
+
+      // جلب عدد الطلاب
+      const { count: studentsCount, error: studentsError } = await supabase
+        .from('students')
+        .select('*', { count: 'exact', head: true });
+
+      if (studentsError) throw studentsError;
+      setTotalStudents(studentsCount || 0);
+
+      // جلب عدد الأساتذة
+      const { count: teachersCount, error: teachersError } = await supabase
+        .from('teachers')
+        .select('*', { count: 'exact', head: true });
+
+      if (teachersError) throw teachersError;
+      setTotalTeachers(teachersCount || 0);
+
+      // جلب عدد الحلقات
+      const { count: circlesCount, error: circlesError } = await supabase
+        .from('circles')
+        .select('*', { count: 'exact', head: true });
+
+      if (circlesError) throw circlesError;
+      setTotalCircles(circlesCount || 0);
+
+      // حساب معدل الحضور اليومي
+      const today = new Date().toISOString().split('T')[0];
+      
+      // جلب عدد الطلاب الحاضرين اليوم
+      const { count: presentCount, error: presentError } = await supabase
+        .from('student_attendance')
+        .select('*', { count: 'exact', head: true })
+        .eq('date', today)
+        .eq('status', 'present');
+
+      if (presentError) throw presentError;
+
+      // حساب النسبة
+      if (studentsCount && studentsCount > 0) {
+        const rate = ((presentCount || 0) / studentsCount) * 100;
+        setAttendanceRate(`${Math.round(rate)}%`);
+      } else {
+        setAttendanceRate("0%");
+      }
+
+    } catch (error) {
+      console.error('Error fetching stats:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const stats = [
     {
       title: "إجمالي الطلاب",
-      value: "150",
+      value: loading ? "..." : totalStudents.toString(),
       icon: Users,
       color: "text-blue-600",
       bgColor: "bg-blue-50",
     },
     {
       title: "عدد الأساتذة",
-      value: "12",
+      value: loading ? "..." : totalTeachers.toString(),
       icon: UserCheck,
       color: "text-emerald-600",
       bgColor: "bg-emerald-50",
     },
     {
       title: "عدد الحلقات",
-      value: "8",
+      value: loading ? "..." : totalCircles.toString(),
       icon: BookOpen,
       color: "text-purple-600",
       bgColor: "bg-purple-50",
     },
     {
-      title: "معدل الحضور",
-      value: "85%",
+      title: "معدل الحضور اليومي",
+      value: loading ? "..." : attendanceRate,
       icon: TrendingUp,
       color: "text-orange-600",
       bgColor: "bg-orange-50",

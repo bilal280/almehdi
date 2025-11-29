@@ -8,12 +8,24 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Edit, Trash2, User, Upload } from "lucide-react";
+import { Plus, Edit, Trash2, User, Upload, Download } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { exportToExcel } from "@/lib/exportToExcel";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface Student {
   id: string;
+  student_number?: number;
   name: string;
   age: number;
   photo_url?: string;
@@ -41,6 +53,9 @@ const StudentManagement = () => {
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [selectedCircle, setSelectedCircle] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [studentToDelete, setStudentToDelete] = useState<{id: string, name: string} | null>(null);
+  const [discontinueReason, setDiscontinueReason] = useState("");
   const [formData, setFormData] = useState({
     name: "",
     age: "",
@@ -214,28 +229,40 @@ const StudentManagement = () => {
     setIsAddDialogOpen(true);
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDeleteClick = (student: Student) => {
+    setStudentToDelete({ id: student.id, name: student.name });
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!studentToDelete) return;
+
     try {
-      const { error } = await supabase
-        .from('students')
-        .delete()
-        .eq('id', id);
+      // استدعاء دالة نقل الطالب إلى المنقطعين
+      const { data, error } = await supabase.rpc('move_student_to_discontinued', {
+        p_student_id: studentToDelete.id,
+        p_reason: discontinueReason || null
+      });
 
       if (error) throw error;
 
       toast({
         title: "تم بنجاح",
-        description: "تم حذف الطالب بنجاح",
+        description: `تم نقل الطالب ${studentToDelete.name} إلى قائمة المنقطعين. جميع سجلاته محفوظة.`,
       });
 
       await fetchStudents();
-    } catch (error) {
-      console.error('Error deleting student:', error);
+    } catch (error: any) {
+      console.error('Error moving student to discontinued:', error);
       toast({
         title: "خطأ",
-        description: "فشل في حذف الطالب",
+        description: error?.message || "فشل في نقل الطالب إلى المنقطعين",
         variant: "destructive",
       });
+    } finally {
+      setDeleteDialogOpen(false);
+      setStudentToDelete(null);
+      setDiscontinueReason("");
     }
   };
 
@@ -254,6 +281,49 @@ const StudentManagement = () => {
       level: "تلاوة"
     });
     setEditingStudent(null);
+  };
+
+  const handleExportAllStudents = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('students')
+        .select(`
+          *,
+          circles ( name )
+        `)
+        .order('name');
+
+      if (error) throw error;
+
+      const exportData = (data || []).map((s: any, index: number) => ({
+        'الرقم': index + 1,
+        'رقم الطالب': s.student_number || '-',
+        'اسم الطالب': s.name || '-',
+        'العمر': typeof s.age === 'number' ? s.age : '-',
+        'الحلقة': s.circles?.name || '-',
+        'المستوى': s.level || '-',
+        'اسم الأب': s.father_name || '-',
+        'اسم الأم': s.mother_name || '-',
+        'منطقة السكن': s.residence_area || '-',
+        'رقم التواصل 1': s.contact_number || '-',
+        'رقم التواصل 2': s.contact_number_2 || '-',
+        'رابط الصورة': s.photo_url || '-',
+        'ملاحظات': s.notes || '-',
+      }));
+
+      exportToExcel(exportData, `بيانات_الطلاب_كاملة_${new Date().toLocaleDateString('ar-SA')}`, 'الطلاب');
+      toast({
+        title: 'تم التصدير بنجاح',
+        description: 'تم تصدير جميع معلومات الطلاب إلى ملف Excel',
+      });
+    } catch (err) {
+      console.error('Export students failed:', err);
+      toast({
+        title: 'خطأ',
+        description: 'فشل تصدير بيانات الطلاب',
+        variant: 'destructive',
+      });
+    }
   };
 
   return (
@@ -473,6 +543,10 @@ const StudentManagement = () => {
                     </SelectContent>
                   </Select>
                 </div>
+                <Button onClick={handleExportAllStudents} className="gap-2">
+                  <Download className="w-4 h-4" />
+                  تصدير كل البيانات
+                </Button>
               </div>
             </div>
           </CardHeader>
@@ -526,7 +600,7 @@ const StudentManagement = () => {
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => handleDelete(student.id)}
+                            onClick={() => handleDeleteClick(student)}
                             className="text-red-600 hover:text-red-700"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -568,6 +642,48 @@ const StudentManagement = () => {
           </CardContent>
         </Card>
       </div>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-right">تأكيد نقل الطالب إلى المنقطعين</AlertDialogTitle>
+            <AlertDialogDescription className="text-right space-y-4">
+              <p>
+                هل أنت متأكد من نقل الطالب <span className="font-bold text-foreground">{studentToDelete?.name}</span> إلى قائمة المنقطعين؟
+              </p>
+              <p className="text-sm text-muted-foreground">
+                ملاحظة: لن يتم حذف أي بيانات. سيتم نقل الطالب إلى قائمة المنقطعين مع الحفاظ على جميع سجلاته (الحضور، الأعمال، الاختبارات، النقاط).
+              </p>
+              <div className="space-y-2">
+                <Label htmlFor="reason" className="text-right block">سبب الانقطاع (اختياري)</Label>
+                <Textarea
+                  id="reason"
+                  value={discontinueReason}
+                  onChange={(e) => setDiscontinueReason(e.target.value)}
+                  placeholder="مثال: انتقل إلى مدينة أخرى، ظروف عائلية، إلخ..."
+                  className="text-right"
+                  rows={3}
+                />
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex gap-2">
+            <AlertDialogCancel onClick={() => {
+              setDeleteDialogOpen(false);
+              setStudentToDelete(null);
+              setDiscontinueReason("");
+            }}>
+              إلغاء
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              نعم، نقل إلى المنقطعين
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

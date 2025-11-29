@@ -76,73 +76,88 @@ const CircleActivities = () => {
     }
   };
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const handleAddActivity = async () => {
-    if (newActivity.activity_type.trim() && newActivity.description.trim()) {
-      try {
-        const teacherData = localStorage.getItem('teacher');
-        if (!teacherData) {
-          toast({
-            title: "خطأ",
-            description: "يجب تسجيل الدخول أولاً",
-            variant: "destructive",
-          });
-          return;
-        }
-        
-        const teacher = JSON.parse(teacherData);
+    if (!newActivity.activity_type.trim() || !newActivity.description.trim()) {
+      toast({
+        title: "خطأ",
+        description: "يرجى ملء جميع الحقول المطلوبة",
+        variant: "destructive",
+      });
+      return;
+    }
 
-        // جلب أول حلقة للمعلم
-        const { data: circles, error: circlesError } = await supabase
-          .from('circles')
-          .select('id')
-          .eq('teacher_id', teacher.id)
-          .limit(1)
-          .single();
+    if (isSubmitting) return; // منع الضغط المتعدد
 
-        if (circlesError) throw circlesError;
-
-        if (!circles) {
-          toast({
-            title: "خطأ",
-            description: "لا توجد حلقات مسجلة لهذا المعلم",
-            variant: "destructive",
-          });
-          return;
-        }
-
-        const { error } = await supabase
-          .from('circle_daily_activities')
-          .insert({
-            circle_id: circles.id,
-            activity_type: newActivity.activity_type,
-            description: newActivity.description,
-            target_pages: newActivity.target_pages || 0,
-            notes: newActivity.notes,
-          });
-
-        if (error) throw error;
-
-        toast({
-          title: "تم بنجاح",
-          description: "تم إضافة النشاط بنجاح",
-        });
-
-        setNewActivity({
-          activity_type: "",
-          description: "",
-          target_pages: 0,
-          notes: "",
-        });
-        setIsAddOpen(false);
-        fetchActivities();
-      } catch (error) {
-        console.error('Error adding activity:', error);
+    try {
+      setIsSubmitting(true);
+      
+      const teacherData = localStorage.getItem('teacher');
+      if (!teacherData) {
         toast({
           title: "خطأ",
-          description: "فشل في إضافة النشاط",
+          description: "يجب تسجيل الدخول أولاً",
           variant: "destructive",
         });
+        return;
       }
+      
+      const teacher = JSON.parse(teacherData);
+
+      // جلب أول حلقة للمعلم
+      const { data: circles, error: circlesError } = await supabase
+        .from('circles')
+        .select('id')
+        .eq('teacher_id', teacher.id)
+        .limit(1)
+        .single();
+
+      if (circlesError) throw circlesError;
+
+      if (!circles) {
+        toast({
+          title: "خطأ",
+          description: "لا توجد حلقات مسجلة لهذا المعلم",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const { error } = await supabase
+        .from('circle_daily_activities')
+        .insert({
+          circle_id: circles.id,
+          activity_type: newActivity.activity_type,
+          description: newActivity.description,
+          target_pages: newActivity.target_pages || 0,
+          notes: newActivity.notes,
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: "تم بنجاح",
+        description: "تم إضافة النشاط بنجاح",
+      });
+
+      setNewActivity({
+        activity_type: "",
+        description: "",
+        target_pages: 0,
+        notes: "",
+      });
+      setIsAddOpen(false);
+      fetchActivities();
+    } catch (error) {
+      console.error('Error adding activity:', error);
+      toast({
+        title: "خطأ",
+        description: "فشل في إضافة النشاط",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -259,14 +274,16 @@ const CircleActivities = () => {
                 <div className="flex gap-2 pt-4">
                   <Button
                     onClick={handleAddActivity}
+                    disabled={isSubmitting}
                     className="flex-1 bg-gradient-to-r from-primary to-primary-light hover:from-primary-dark hover:to-primary text-primary-foreground"
                   >
-                    إضافة
+                    {isSubmitting ? "جاري الإضافة..." : "إضافة"}
                   </Button>
                   <Button
                     onClick={() => setIsAddOpen(false)}
                     variant="outline"
                     className="flex-1"
+                    disabled={isSubmitting}
                   >
                     إلغاء
                   </Button>

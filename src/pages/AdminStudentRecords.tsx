@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { FileText } from "lucide-react";
+import { FileText, Download } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -8,6 +8,7 @@ import AdminNavbar from "@/components/AdminNavbar";
 import ProtectedAdminRoute from "@/components/ProtectedAdminRoute";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { exportToExcel } from "@/lib/exportToExcel";
 
 interface StudentSummary {
   student_id: string;
@@ -30,6 +31,7 @@ interface StudentMonthlyRecord {
   retakeCount: number;
   behaviorAverage: string;
   totalPoints: number;
+  monthlyReviewScore: number | null;
 }
 
 interface Circle {
@@ -47,6 +49,9 @@ const AdminStudentRecords = () => {
   // للمحصلات الشهرية والفصلية
   const [summaryView, setSummaryView] = useState<'monthly' | 'quarterly'>('monthly');
   const [selectedMonth, setSelectedMonth] = useState<string>(new Date().getMonth().toString());
+  const [selectedYear, setSelectedYear] = useState<string>(new Date().getFullYear().toString());
+  const [availableMonths, setAvailableMonths] = useState<{value: string, label: string}[]>([]);
+  const [availableYears, setAvailableYears] = useState<string[]>([]);
   const [summaryRecords, setSummaryRecords] = useState<StudentMonthlyRecord[]>([]);
   const [loadingSummary, setLoadingSummary] = useState(false);
   
@@ -54,11 +59,66 @@ const AdminStudentRecords = () => {
 
   useEffect(() => {
     fetchCircles();
+    fetchAvailableMonthsAndYears();
   }, []);
 
   useEffect(() => {
     fetchRecords();
   }, [selectedView, selectedCircle]);
+
+  const fetchAvailableMonthsAndYears = async () => {
+    try {
+      // جلب التواريخ من الأعمال اليومية
+      const { data: workDates } = await supabase
+        .from('student_daily_work')
+        .select('date');
+
+      // جلب التواريخ من الحضور
+      const { data: attendanceDates } = await supabase
+        .from('student_attendance')
+        .select('date');
+
+      // دمج التواريخ
+      const allDates = [
+        ...(workDates?.map(d => d.date) || []),
+        ...(attendanceDates?.map(d => d.date) || [])
+      ];
+
+      // استخراج الأشهر والسنوات الفريدة
+      const monthYearSet = new Set<string>();
+      const yearSet = new Set<string>();
+
+      allDates.forEach(dateStr => {
+        const date = new Date(dateStr);
+        const month = date.getMonth();
+        const year = date.getFullYear();
+        monthYearSet.add(`${year}-${month}`);
+        yearSet.add(year.toString());
+      });
+
+      // تحويل إلى مصفوفات
+      const years = Array.from(yearSet).sort((a, b) => parseInt(b) - parseInt(a));
+      setAvailableYears(years);
+
+      // تصفية الأشهر حسب السنة المختارة
+      updateAvailableMonths(monthYearSet, selectedYear);
+
+    } catch (error) {
+      console.error('Error fetching available months:', error);
+    }
+  };
+
+  const updateAvailableMonths = (monthYearSet: Set<string>, year: string) => {
+    const monthsForYear = months.filter(m => 
+      monthYearSet.has(`${year}-${m.value}`)
+    );
+    setAvailableMonths(monthsForYear);
+    
+    // إذا كان الشهر المختار غير موجود في القائمة، اختر أول شهر متاح
+    if (monthsForYear.length > 0 && !monthsForYear.find(m => m.value === selectedMonth)) {
+      setSelectedMonth(monthsForYear[0].value);
+    }
+  };
 
   const fetchCircles = async () => {
     try {
@@ -209,6 +269,10 @@ const AdminStudentRecords = () => {
   };
 
   const fetchMonthlyRecordsForAllStudents = async (startDate: Date, endDate: Date) => {
+    // تحديث السنة في startDate و endDate
+    startDate.setFullYear(parseInt(selectedYear));
+    endDate.setFullYear(parseInt(selectedYear));
+    
     const startDateStr = startDate.toISOString().split('T')[0];
     const endDateStr = endDate.toISOString().split('T')[0];
 
@@ -270,6 +334,16 @@ const AdminStudentRecords = () => {
       .gte('date', startDateStr)
       .lte('date', endDateStr);
 
+    // جلب المذاكرة الشهرية
+    const monthNum = startDate.getMonth() + 1;
+    const yearNum = startDate.getFullYear();
+    // @ts-ignore - monthly_reviews table will be added after migration
+    const { data: monthlyReviewsData } = await (supabase as any)
+      .from('monthly_reviews')
+      .select('*')
+      .eq('month', monthNum)
+      .eq('year', yearNum);
+
     // حساب الإحصائيات لكل طالب
     const summaryRecordsArray: StudentMonthlyRecord[] = [];
 
@@ -316,9 +390,26 @@ const AdminStudentRecords = () => {
       const studentPoints = pointsData?.filter(p => p.student_id === studentId) || [];
       const totalPointsSum = studentPoints.reduce((sum, p) => sum + p.points, 0);
 
-      // آخر صفحة
+      // المذاكرة الشهرية
+      // @ts-ignore
+      const monthlyReview = monthlyReviewsData?.find(r => r.student_id === studentId);
+      // @ts-ignore
+      const monthlyReviewScore = monthlyReview?.score || null;
+
+      // آخر صفحة - نحتاج لجلب رقم الصفحة من new_recitation_page_numbers
       const lastWork = studentDailyWork[studentDailyWork.length - 1];
-      const lastPage = lastWork ? `${lastWork.new_recitation_pages || 0}` : "لا يوجد";
+      let lastPage = "لا يوجد";
+      
+      if (lastWork && lastWork.new_recitation_page_numbers) {
+        // استخراج آخر رقم صفحة من النص
+        const pageNumbers = lastWork.new_recitation_page_numbers.split(',').map((p: string) => p.trim());
+        if (pageNumbers.length > 0) {
+          lastPage = pageNumbers[pageNumbers.length - 1];
+        }
+      } else if (lastWork && lastWork.new_recitation_pages) {
+        // في حالة عدم وجود أرقام الصفحات، نعرض عدد الصفحات فقط
+        lastPage = `${lastWork.new_recitation_pages} صفحة`;
+      }
 
       summaryRecordsArray.push({
         student_id: studentId,
@@ -330,7 +421,8 @@ const AdminStudentRecords = () => {
         examsCount,
         retakeCount,
         behaviorAverage,
-        totalPoints: totalPointsSum
+        totalPoints: totalPointsSum,
+        monthlyReviewScore
       });
     });
 
@@ -370,12 +462,59 @@ const AdminStudentRecords = () => {
     { value: "11", label: "ديسمبر" },
   ];
 
+  const handleExportBasicRecords = () => {
+    const exportData = records.map((record, index) => ({
+      'الرقم': index + 1,
+      'اسم الطالب': record.studentName,
+      'الحلقة': record.circleName,
+      'صفحات التسميع': record.totalRecitationPages,
+      'صفحات المراجعة': record.totalReviewPages,
+      'الأحاديث': record.totalHadithCount,
+      'الاختبارات': record.totalExams,
+    }));
+
+    const viewType = selectedView === 'weekly' ? 'أسبوعي' : 'شهري';
+    const circleName = selectedCircle === 'all' ? 'جميع_الحلقات' : circles.find(c => c.id === selectedCircle)?.name || 'حلقة';
+    exportToExcel(exportData, `سجلات_الطلاب_${viewType}_${circleName}_${new Date().toLocaleDateString('ar-SA')}`, 'السجلات الأساسية');
+    
+    toast({
+      title: "تم التصدير بنجاح",
+      description: "تم تصدير السجلات إلى ملف Excel",
+    });
+  };
+
+  const handleExportSummaryRecords = () => {
+    const exportData = summaryRecords.map((record, index) => ({
+      'الرقم': index + 1,
+      'اسم الطالب': record.studentName,
+      'الحلقة': record.circleName,
+      'مجموع الصفحات': record.totalPages,
+      'الغيابات': record.absenceCount,
+      'آخر صفحة': record.lastPage,
+      'عدد الاختبارات': record.examsCount,
+      'الإعادة': record.retakeCount,
+      'متوسط السلوك': record.behaviorAverage,
+      'المذاكرة الشهرية': record.monthlyReviewScore !== null ? `${record.monthlyReviewScore}/100` : '-',
+      'مجموع النقاط': record.totalPoints,
+    }));
+
+    const viewType = summaryView === 'monthly' ? 'شهري' : 'فصلي';
+    const monthName = months[parseInt(selectedMonth)].label;
+    const circleName = selectedCircle === 'all' ? 'جميع_الحلقات' : circles.find(c => c.id === selectedCircle)?.name || 'حلقة';
+    exportToExcel(exportData, `المحصلات_${viewType}_${monthName}_${circleName}_${new Date().toLocaleDateString('ar-SA')}`, 'المحصلات');
+    
+    toast({
+      title: "تم التصدير بنجاح",
+      description: "تم تصدير المحصلات إلى ملف Excel",
+    });
+  };
+
   return (
     <ProtectedAdminRoute>
       <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background islamic-pattern">
         <AdminNavbar />
         
-        <main className="container mx-auto px-4 py-8">
+        <main dir="rtl" className="container mx-auto px-4 py-8">
           <div className="islamic-card p-6 mb-8 fade-in-up">
             <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
               <div className="flex items-center gap-4">
@@ -419,6 +558,14 @@ const AdminStudentRecords = () => {
 
               {/* السجلات الأساسية */}
               <TabsContent value="basic">
+                {!loading && records.length > 0 && (
+                  <div className="mb-4 flex justify-end">
+                    <Button onClick={handleExportBasicRecords} className="gap-2">
+                      <Download className="w-4 h-4" />
+                      تصدير إلى Excel
+                    </Button>
+                  </div>
+                )}
                 {loading ? (
                   <div className="text-center py-12">
                     <p className="text-muted-foreground">جاري تحميل السجلات...</p>
@@ -432,11 +579,11 @@ const AdminStudentRecords = () => {
                     </p>
                   </div>
                 ) : (
-                  <div className="overflow-x-auto">
+                  <div className="overflow-x-auto" dir="rtl">
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead className="text-right">اسم الطالب</TableHead>
+                          <TableHead className="text-center">اسم الطالب</TableHead>
                           <TableHead className="text-right">الحلقة</TableHead>
                           <TableHead className="text-center">صفحات التسميع</TableHead>
                           <TableHead className="text-center">صفحات المراجعة</TableHead>
@@ -447,7 +594,7 @@ const AdminStudentRecords = () => {
                       <TableBody>
                         {records.map((record) => (
                           <TableRow key={record.student_id}>
-                            <TableCell className="font-medium">{record.studentName}</TableCell>
+                            <TableCell className="text-center font-medium">{record.studentName}</TableCell>
                             <TableCell>{record.circleName}</TableCell>
                             <TableCell className="text-center">{record.totalRecitationPages}</TableCell>
                             <TableCell className="text-center">{record.totalReviewPages}</TableCell>
@@ -464,7 +611,15 @@ const AdminStudentRecords = () => {
               {/* المحصلات الشهرية والفصلية */}
               <TabsContent value="summary">
                 <div className="space-y-6">
-                  <div className="flex gap-4 items-center">
+                  {summaryRecords.length > 0 && (
+                    <div className="flex justify-end">
+                      <Button onClick={handleExportSummaryRecords} className="gap-2">
+                        <Download className="w-4 h-4" />
+                        تصدير إلى Excel
+                      </Button>
+                    </div>
+                  )}
+                  <div className="flex gap-4 items-center flex-wrap">
                     <Tabs value={summaryView} onValueChange={(v) => setSummaryView(v as 'monthly' | 'quarterly')}>
                       <TabsList className="grid w-full grid-cols-2">
                         <TabsTrigger value="monthly">شهري</TabsTrigger>
@@ -472,16 +627,35 @@ const AdminStudentRecords = () => {
                       </TabsList>
                     </Tabs>
 
+                    <Select value={selectedYear} onValueChange={setSelectedYear}>
+                      <SelectTrigger className="w-[150px] bg-background">
+                        <SelectValue placeholder="اختر السنة" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableYears.map(year => (
+                          <SelectItem key={year} value={year}>
+                            {year}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
                     <Select value={selectedMonth} onValueChange={setSelectedMonth}>
                       <SelectTrigger className="w-48 bg-background">
                         <SelectValue placeholder="اختر الشهر" />
                       </SelectTrigger>
                       <SelectContent>
-                        {months.map((month) => (
-                          <SelectItem key={month.value} value={month.value}>
-                            {month.label}
+                        {availableMonths.length > 0 ? (
+                          availableMonths.map((month) => (
+                            <SelectItem key={month.value} value={month.value}>
+                              {month.label}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="none" disabled>
+                            لا توجد بيانات لهذه السنة
                           </SelectItem>
-                        ))}
+                        )}
                       </SelectContent>
                     </Select>
 
@@ -495,11 +669,11 @@ const AdminStudentRecords = () => {
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
                     </div>
                   ) : summaryRecords.length > 0 ? (
-                    <div className="overflow-x-auto">
+                    <div className="overflow-x-auto" dir="rtl">
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead className="text-right">اسم الطالب</TableHead>
+                            <TableHead className="text-center">اسم الطالب</TableHead>
                             <TableHead className="text-right">الحلقة</TableHead>
                             <TableHead className="text-center">مجموع الصفحات</TableHead>
                             <TableHead className="text-center">الغيابات</TableHead>
@@ -507,13 +681,14 @@ const AdminStudentRecords = () => {
                             <TableHead className="text-center">عدد الاختبارات</TableHead>
                             <TableHead className="text-center">الإعادة</TableHead>
                             <TableHead className="text-center">متوسط السلوك</TableHead>
+                            <TableHead className="text-center">المذاكرة الشهرية</TableHead>
                             <TableHead className="text-center">مجموع النقاط</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {summaryRecords.map((record) => (
                             <TableRow key={record.student_id}>
-                              <TableCell className="font-medium">{record.studentName}</TableCell>
+                              <TableCell className="text-center font-medium">{record.studentName}</TableCell>
                               <TableCell>{record.circleName}</TableCell>
                               <TableCell className="text-center">{record.totalPages}</TableCell>
                               <TableCell className="text-center">{record.absenceCount}</TableCell>
@@ -521,6 +696,20 @@ const AdminStudentRecords = () => {
                               <TableCell className="text-center">{record.examsCount}</TableCell>
                               <TableCell className="text-center">{record.retakeCount}</TableCell>
                               <TableCell className="text-center">{record.behaviorAverage}</TableCell>
+                              <TableCell className="text-center">
+                                {record.monthlyReviewScore !== null ? (
+                                  <span className={`font-bold ${
+                                    record.monthlyReviewScore >= 90 ? 'text-green-600' :
+                                    record.monthlyReviewScore >= 75 ? 'text-blue-600' :
+                                    record.monthlyReviewScore >= 60 ? 'text-yellow-600' :
+                                    'text-red-600'
+                                  }`}>
+                                    {record.monthlyReviewScore}/100
+                                  </span>
+                                ) : (
+                                  <span className="text-muted-foreground">-</span>
+                                )}
+                              </TableCell>
                               <TableCell className="text-center font-bold text-primary">{record.totalPoints}</TableCell>
                             </TableRow>
                           ))}

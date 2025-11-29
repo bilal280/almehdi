@@ -1,5 +1,4 @@
 import { Calendar, User } from "lucide-react";
-import studentPhotoUrl from "@/assets/student-photo.jpg";
 
 interface StudentCardProps {
   studentName: string;
@@ -9,12 +8,15 @@ interface StudentCardProps {
 }
 
 const StudentCard = ({ studentName, photoUrl, date, dayName }: StudentCardProps) => {
+  // استخدام لوغو المعهد إذا لم تكن هناك صورة للطالب
+  const displayPhoto = photoUrl || "/institute-logo.png";
+  
   return (
     <div className="islamic-card p-6 mb-6 fade-in-up">
       <div className="flex items-center gap-6">
         <div className="relative">
           <img 
-            src={photoUrl || studentPhotoUrl} 
+            src={displayPhoto} 
             alt={`صورة الطالب ${studentName}`}
             className="w-24 h-24 rounded-full object-cover border-4 border-primary shadow-lg"
           />

@@ -19,6 +19,7 @@ const TeacherNavbar = () => {
     { to: "/teacher/students", icon: Users, label: "إدارة الطلاب" },
     { to: "/teacher/activities", icon: BookOpen, label: "أعمال الحلقة" },
     { to: "/teacher/records", icon: FileText, label: "السجلات" },
+    { to: "/teacher/monthly-review", icon: Award, label: "المذاكرة الشهرية" },
   ];
 
   return (

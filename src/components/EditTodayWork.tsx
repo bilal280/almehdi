@@ -18,8 +18,10 @@ interface Student {
 interface TodayWork {
   id: string;
   new_recitation_pages: number;
+  new_recitation_page_numbers: string;
   new_recitation_grade: string;
   review_pages: number;
+  review_page_numbers: string;
   review_grade: string;
   hadith_count: number;
   hadith_grade: string;
@@ -48,8 +50,10 @@ const EditTodayWork = ({ students }: EditTodayWorkProps) => {
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({
     new_recitation_pages: "",
+    new_recitation_page_numbers: "",
     new_recitation_grade: "",
     review_pages: "",
+    review_page_numbers: "",
     review_grade: "",
     hadith_count: "",
     hadith_grade: "",
@@ -108,8 +112,10 @@ const EditTodayWork = ({ students }: EditTodayWorkProps) => {
         setTodayWork(data);
         setFormData({
           new_recitation_pages: data.new_recitation_pages?.toString() || "",
+          new_recitation_page_numbers: data.new_recitation_page_numbers || "",
           new_recitation_grade: data.new_recitation_grade || "",
           review_pages: data.review_pages?.toString() || "",
+          review_page_numbers: data.review_page_numbers || "",
           review_grade: data.review_grade || "",
           hadith_count: data.hadith_count?.toString() || "",
           hadith_grade: data.hadith_grade || "",
@@ -166,12 +172,23 @@ const EditTodayWork = ({ students }: EditTodayWorkProps) => {
     try {
       // تحديث أعمال اليوم العادية إذا وجدت
       if (todayWork) {
+        // حساب عدد الصفحات من أرقام الصفحات
+        const newRecitationCount = formData.new_recitation_page_numbers 
+          ? formData.new_recitation_page_numbers.split(',').filter(p => p.trim()).length 
+          : parseInt(formData.new_recitation_pages) || 0;
+        
+        const reviewCount = formData.review_page_numbers 
+          ? formData.review_page_numbers.split(',').filter(p => p.trim()).length 
+          : parseInt(formData.review_pages) || 0;
+
         const { error } = await supabase
           .from('student_daily_work')
           .update({
-            new_recitation_pages: parseInt(formData.new_recitation_pages) || 0,
+            new_recitation_pages: newRecitationCount,
+            new_recitation_page_numbers: formData.new_recitation_page_numbers || null,
             new_recitation_grade: formData.new_recitation_grade,
-            review_pages: parseInt(formData.review_pages) || 0,
+            review_pages: reviewCount,
+            review_page_numbers: formData.review_page_numbers || null,
             review_grade: formData.review_grade,
             hadith_count: parseInt(formData.hadith_count) || 0,
             hadith_grade: formData.hadith_grade,
@@ -211,8 +228,10 @@ const EditTodayWork = ({ students }: EditTodayWorkProps) => {
       setStudentLevel("");
       setFormData({
         new_recitation_pages: "",
+        new_recitation_page_numbers: "",
         new_recitation_grade: "",
         review_pages: "",
+        review_page_numbers: "",
         review_grade: "",
         hadith_count: "",
         hadith_grade: "",
@@ -239,8 +258,10 @@ const EditTodayWork = ({ students }: EditTodayWorkProps) => {
     setStudentLevel("");
     setFormData({
       new_recitation_pages: "",
+      new_recitation_page_numbers: "",
       new_recitation_grade: "",
       review_pages: "",
+      review_page_numbers: "",
       review_grade: "",
       hadith_count: "",
       hadith_grade: "",
@@ -342,16 +363,39 @@ const EditTodayWork = ({ students }: EditTodayWorkProps) => {
                 </div>
               )}
               
+              {studentLevel !== 'تمهيدي' && (
+                <>
+                  <div>
+                    <Label>أرقام صفحات التسميع الجديد (مفصولة بفاصلة)</Label>
+                    <Input
+                      type="text"
+                      value={formData.new_recitation_page_numbers}
+                      onChange={(e) => setFormData({...formData, new_recitation_page_numbers: e.target.value})}
+                      placeholder="مثال: 1, 2, 3"
+                      className="mt-2"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      أدخل أرقام الصفحات مفصولة بفاصلة (مثال: 1, 2, 3)
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <Label>أرقام صفحات المراجعة (مفصولة بفاصلة)</Label>
+                    <Input
+                      type="text"
+                      value={formData.review_page_numbers}
+                      onChange={(e) => setFormData({...formData, review_page_numbers: e.target.value})}
+                      placeholder="مثال: 10, 11, 12"
+                      className="mt-2"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      أدخل أرقام الصفحات مفصولة بفاصلة (مثال: 10, 11, 12)
+                    </p>
+                  </div>
+                </>
+              )}
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label>عدد صفحات التسميع الجديد</Label>
-                  <Input
-                    type="number"
-                    value={formData.new_recitation_pages}
-                    onChange={(e) => setFormData({...formData, new_recitation_pages: e.target.value})}
-                    className="mt-2"
-                  />
-                </div>
                 <div>
                   <Label>تقدير التسميع الجديد</Label>
                   <Select value={formData.new_recitation_grade} onValueChange={(value) => setFormData({...formData, new_recitation_grade: value})}>
@@ -366,18 +410,6 @@ const EditTodayWork = ({ students }: EditTodayWorkProps) => {
                       ))}
                     </SelectContent>
                   </Select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label>عدد صفحات المراجعة</Label>
-                  <Input
-                    type="number"
-                    value={formData.review_pages}
-                    onChange={(e) => setFormData({...formData, review_pages: e.target.value})}
-                    className="mt-2"
-                  />
                 </div>
                 <div>
                   <Label>تقدير المراجعة</Label>

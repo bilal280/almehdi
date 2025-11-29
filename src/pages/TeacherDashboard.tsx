@@ -24,12 +24,22 @@ const TeacherDashboard = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [students, setStudents] = useState<Student[]>([]);
+  const [teacherName, setTeacherName] = useState<string>("الأستاذ");
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
     fetchStudents();
+    loadTeacherName();
   }, []);
+
+  const loadTeacherName = () => {
+    const teacherData = localStorage.getItem('teacher');
+    if (teacherData) {
+      const teacher = JSON.parse(teacherData);
+      setTeacherName(teacher.name || "الأستاذ");
+    }
+  };
 
   const fetchStudents = async () => {
     try {
@@ -132,7 +142,7 @@ const TeacherDashboard = () => {
         {/* Welcome Card */}
         <div className="islamic-card p-6 mb-8 text-center fade-in-up">
           <BookOpen className="w-12 h-12 text-primary mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-primary mb-2">مرحباً أستاذ محمد</h2>
+          <h2 className="text-2xl font-bold text-primary mb-2">مرحباً {teacherName}</h2>
           <p className="text-muted-foreground">قم بتسجيل حضور الطلاب وإضافة أعمالهم اليومية</p>
         </div>
 

@@ -9,6 +9,7 @@ import NotesSection from "@/components/NotesSection";
 import IslamicTime from "@/components/IslamicTime";
 import PointsSection from "@/components/PointsSection";
 import ExamSection from "@/components/ExamSection";
+import MonthlyReviewSection from "@/components/MonthlyReviewSection";
 import { RotateCcw, BookOpen, AlertCircle, ArrowLeft, FileText } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -155,6 +156,18 @@ const DynamicStudentReport = () => {
         .eq('exam_date', today)
         .order('created_at', { ascending: false });
 
+      // جلب المذاكرة الشهرية للشهر الحالي
+      const currentMonth = new Date().getMonth() + 1;
+      const currentYear = new Date().getFullYear();
+      // @ts-ignore
+      const { data: monthlyReview } = await (supabase as any)
+        .from('monthly_reviews')
+        .select('*')
+        .eq('student_id', studentId)
+        .eq('month', currentMonth)
+        .eq('year', currentYear)
+        .maybeSingle();
+
       // تحضير البيانات حسب المستوى
       let newRecitations = [];
       let reviews = [];
@@ -191,6 +204,14 @@ const DynamicStudentReport = () => {
         }
       }
 
+      // تحضير بيانات المذاكرة الشهرية
+      const months = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+      const monthlyReviewData = monthlyReview ? {
+        score: monthlyReview.score,
+        notes: monthlyReview.notes,
+        month: months[currentMonth - 1]
+      } : null;
+
       setCurrentStudentId(studentId);
       setStudentData({
         name: student.name,
@@ -215,7 +236,8 @@ const DynamicStudentReport = () => {
         enthusiasmPoints,
         generalPoints,
         notes: dailyWork?.teacher_notes ? [dailyWork.teacher_notes] : [],
-        exams: exams || []
+        exams: exams || [],
+        monthlyReview: monthlyReviewData
       });
 
     } catch (error) {
@@ -779,6 +801,14 @@ const DynamicStudentReport = () => {
           />
           
           <BehaviorSection behavior={studentData.behavior} />
+          
+          {studentData.monthlyReview && (
+            <MonthlyReviewSection 
+              score={studentData.monthlyReview.score}
+              notes={studentData.monthlyReview.notes}
+              month={studentData.monthlyReview.month}
+            />
+          )}
           
           {studentData.notes.length > 0 && (
             <NotesSection notes={studentData.notes} />

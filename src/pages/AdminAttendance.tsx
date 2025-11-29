@@ -3,9 +3,10 @@ import AdminNavbar from "@/components/AdminNavbar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { UserX, Calendar } from "lucide-react";
+import { UserX, Calendar, Download } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { exportToExcel } from "@/lib/exportToExcel";
 
 interface AbsentStudent {
   id: string;
@@ -13,7 +14,8 @@ interface AbsentStudent {
   date: string;
   student_name: string;
   circle_name: string;
-  student_age: number;
+  contact_number?: string;
+  justification?: 'justified' | 'unjustified' | undefined;
 }
 
 const AdminAttendance = () => {
@@ -37,7 +39,7 @@ const AdminAttendance = () => {
           date,
           students (
             name,
-            age,
+            contact_number,
             circles (
               name
             )
@@ -49,13 +51,18 @@ const AdminAttendance = () => {
 
       if (error) throw error;
 
+      // تحميل تبريرات اليوم من التخزين المحلي
+      const localKey = `attendance_justifications_${selectedDate}`;
+      const savedJustifications: Record<string, 'justified' | 'unjustified'> = JSON.parse(localStorage.getItem(localKey) || '{}');
+
       const formattedData: AbsentStudent[] = data.map((record: any) => ({
         id: record.id,
         student_id: record.student_id,
         date: record.date,
         student_name: record.students?.name || 'غير معروف',
         circle_name: record.students?.circles?.name || 'غير محدد',
-        student_age: record.students?.age || 0,
+        contact_number: record.students?.contact_number || '-',
+        justification: savedJustifications[record.student_id],
       }));
 
       setAbsentStudents(formattedData);
@@ -69,6 +76,21 @@ const AdminAttendance = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const localKey = `attendance_justifications_${selectedDate}`;
+
+  const setJustification = (studentId: string, value: 'justified' | 'unjustified') => {
+    const existing: Record<string, 'justified' | 'unjustified'> = JSON.parse(localStorage.getItem(localKey) || '{}');
+    const updated = { ...existing, [studentId]: value };
+    localStorage.setItem(localKey, JSON.stringify(updated));
+    setAbsentStudents(prev => prev.map(s => s.student_id === studentId ? { ...s, justification: value } : s));
+  };
+
+  const clearJustificationsForSelectedDate = () => {
+    localStorage.removeItem(localKey);
+    setAbsentStudents(prev => prev.map(s => ({ ...s, justification: undefined })));
+    toast({ title: 'تم المسح', description: 'تم مسح تبريرات هذا اليوم' });
   };
 
   const getWeekDates = () => {
@@ -88,6 +110,23 @@ const AdminAttendance = () => {
 
   const weekDates = getWeekDates();
   const today = new Date().toISOString().split('T')[0];
+
+  const handleExportAttendance = () => {
+    const exportData = absentStudents.map((student, index) => ({
+      'الرقم': absentStudents.length - index,
+      'اسم الطالب': student.student_name,
+      'العمر': `${student.student_age} سنة`,
+      'الحلقة': student.circle_name,
+      'التاريخ': selectedDate,
+    }));
+
+    exportToExcel(exportData, `الطلاب_الغائبين_${selectedDate}`, 'الغياب');
+    
+    toast({
+      title: "تم التصدير بنجاح",
+      description: "تم تصدير سجل الغياب إلى ملف Excel",
+    });
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -136,10 +175,23 @@ const AdminAttendance = () => {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-right flex items-center gap-3">
-              <UserX className="w-6 h-6 text-red-600" />
-              الطلاب الغائبين في {selectedDate}
-            </CardTitle>
+            <div className="flex justify-between items-center">
+              <CardTitle className="text-right flex items-center gap-3">
+                <UserX className="w-6 h-6 text-red-600" />
+                الطلاب الغائبين في {selectedDate}
+              </CardTitle>
+              {!loading && absentStudents.length > 0 && (
+                <div className="flex gap-2">
+                  <Button onClick={handleExportAttendance} className="gap-2">
+                    <Download className="w-4 h-4" />
+                    تصدير إلى Excel
+                  </Button>
+                  <Button variant="outline" onClick={clearJustificationsForSelectedDate}>
+                    مسح التبريرات لليوم
+                  </Button>
+                </div>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             {loading ? (
@@ -157,22 +209,44 @@ const AdminAttendance = () => {
                 </p>
               </div>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="text-right">الحلقة</TableHead>
-                    <TableHead className="text-right">العمر</TableHead>
-                    <TableHead className="text-right">اسم الطالب</TableHead>
-                    <TableHead className="text-right">#</TableHead>
-                  </TableRow>
-                </TableHeader>
+              <div dir="rtl">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="text-right">الحلقة</TableHead>
+                      <TableHead className="text-right">رقم الجوال</TableHead>
+                      <TableHead className="text-right">اسم الطالب</TableHead>
+                      <TableHead className="text-center">مبرر/غير مبرر (اليوم فقط)</TableHead>
+                      <TableHead className="text-right">#</TableHead>
+                    </TableRow>
+                  </TableHeader>
                 <TableBody>
                   {absentStudents.map((student, index) => (
                     <TableRow key={student.id}>
                       <TableCell className="text-right">{student.circle_name}</TableCell>
-                      <TableCell className="text-right">{student.student_age} سنة</TableCell>
+                      <TableCell className="text-right" dir="ltr">{student.contact_number || '-'}</TableCell>
                       <TableCell className="text-right font-semibold">
                         {student.student_name}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <div className="flex items-center justify-center gap-2">
+                          <Button
+                            size="sm"
+                            variant={student.justification === 'justified' ? 'default' : 'outline'}
+                            className={student.justification === 'justified' ? 'bg-green-600 hover:bg-green-700 text-white' : ''}
+                            onClick={() => setJustification(student.student_id, 'justified')}
+                          >
+                            مبرر
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant={student.justification === 'unjustified' ? 'default' : 'outline'}
+                            className={student.justification === 'unjustified' ? 'bg-red-600 hover:bg-red-700 text-white' : ''}
+                            onClick={() => setJustification(student.student_id, 'unjustified')}
+                          >
+                            غير مبرر
+                          </Button>
+                        </div>
                       </TableCell>
                       <TableCell className="text-right">
                         {absentStudents.length - index}
@@ -181,6 +255,7 @@ const AdminAttendance = () => {
                   ))}
                 </TableBody>
               </Table>
+              </div>
             )}
             
             {!loading && absentStudents.length > 0 && (

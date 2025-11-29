@@ -18,9 +18,12 @@ const AdminNavbar = () => {
     { path: "/admin/teachers", label: "إدارة الأساتذة", icon: UserCheck },
     { path: "/admin/circles", label: "إدارة الحلقات", icon: BookOpen },
     { path: "/admin/points", label: "إدارة النقاط", icon: Users },
+    { path: "/admin/points-records", label: "سجلات النقاط", icon: FileText },
     { path: "/admin/attendance", label: "سجل الغياب", icon: UserCheck },
     { path: "/admin/records", label: "السجلات", icon: FileText },
     { path: "/admin/exam-records", label: "سجلات الاختبارات", icon: FileText },
+    { path: "/admin/maintenance", label: "وضع الصيانة", icon: Shield },
+    { path: "/admin/discontinued-students", label: "الطلاب المنقطعين", icon: Users },
   ];
 
   return (
