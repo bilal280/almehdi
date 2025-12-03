@@ -1,4 +1,5 @@
 // نظام حساب النقاط الوهمية للترتيب (غير مرئي للطلاب)
+// ملاحظة: هذه النقاط تُحسب شهرياً وليس يومياً
 
 export interface RankingPointsCalculation {
   behaviorPoints: number;
@@ -9,81 +10,85 @@ export interface RankingPointsCalculation {
 }
 
 /**
- * حساب نقاط الأدب بناءً على التقييم
- * ممتاز = 3 نقاط
+ * حساب نقاط الأدب الشهرية
+ * أدب كامل شهرياً (كل الأيام ممتاز) = 3 نقاط
  * كل درجة نقص عن ممتاز = -2 نقطة
+ * ملاحظة: يتم الحساب على مستوى الشهر وليس اليوم
  */
-export const calculateBehaviorPoints = (behaviorGrade: string): number => {
-  const behaviorMap: Record<string, number> = {
-    'ممتاز': 3,
-    'جيد جداً': 1,  // 3 - 2 = 1
-    'جيد': -1,       // 3 - 4 = -1
-    'مقبول': -3      // 3 - 6 = -3
-  };
+export const calculateMonthlyBehaviorPoints = (
+  behaviorGrades: string[]
+): number => {
+  if (behaviorGrades.length === 0) return 0;
   
-  return behaviorMap[behaviorGrade] || 0;
+  // عدد الأيام التي لم تكن ممتازة
+  const nonExcellentDays = behaviorGrades.filter(grade => grade !== 'ممتاز').length;
+  
+  if (nonExcellentDays === 0) {
+    // أدب كامل طوال الشهر
+    return 3;
+  } else {
+    // كل درجة نقص عن ممتاز = -2 نقطة
+    return -2 * nonExcellentDays;
+  }
 };
 
 /**
- * حساب نقاط الغياب
- * حضور = 3 نقاط
- * غياب = -1 نقطة
+ * حساب نقاط الغياب الشهرية
+ * عدم الغياب شهرياً = 3 نقاط
+ * كل غياب = -1 نقطة
+ * ملاحظة: يتم الحساب على مستوى الشهر وليس اليوم
  */
-export const calculateAttendancePoints = (status: 'present' | 'absent'): number => {
-  return status === 'present' ? 3 : -1;
+export const calculateMonthlyAttendancePoints = (absenceCount: number): number => {
+  if (absenceCount === 0) {
+    // لا غياب طوال الشهر
+    return 3;
+  } else {
+    // كل غياب = -1 نقطة
+    return -1 * absenceCount;
+  }
 };
 
 /**
- * حساب نقاط المذاكرة (من 100)
- * العلامة الكاملة (100) = 3 نقاط
+ * حساب نقاط المذاكرة الشهرية (من 100)
+ * علامة كاملة (100) = 3 نقاط
  * كل نقص 10 = -1 نقطة
+ * الحد الأقصى للخصم = 3 نقاط (أقل من 70 = -3 فقط)
  */
-export const calculateHomeworkPoints = (grade: string | number): number => {
-  const numericGrade = typeof grade === 'string' ? parseFloat(grade) : grade;
-  
-  if (isNaN(numericGrade) || numericGrade === 0) return 0;
-  
-  // العلامة الكاملة 100 = 3 نقاط
-  if (numericGrade >= 100) return 3;
-  
-  // كل نقص 10 = -1 نقطة
-  const diff = 100 - numericGrade;
-  const pointsLost = Math.floor(diff / 10);
-  
-  return Math.max(3 - pointsLost, -7); // حد أدنى -7 نقاط
+export const calculateMonthlyReviewPoints = (score: number): number => {
+  if (score >= 100) {
+    return 3;
+  } else if (score < 70) {
+    // أقل من 70 = -3 نقاط فقط (الحد الأقصى للخصم)
+    return -3;
+  } else {
+    // كل نقص 10 = -1 نقطة
+    return -1 * Math.floor((100 - score) / 10);
+  }
 };
 
 /**
  * حساب نقاط الاختبارات
- * كل اختبار = 3 نقاط
+ * كل اختبار ليس إعادة = 3 نقاط
+ * التسميع: لا نقاط عليه
  */
-export const calculateExamPoints = (examScore: number): number => {
-  if (examScore >= 50) return 3; // اجتاز الاختبار
-  return 0; // لم يجتز
+export const calculateExamPoints = (examCount: number): number => {
+  // كل اختبار ليس إعادة = 3 نقاط
+  return examCount * 3;
 };
 
 /**
- * حساب مجموع النقاط الإجمالية
+ * حساب مجموع النقاط الشهرية الإجمالية
  */
-export const calculateTotalRankingPoints = (
-  behaviorGrade?: string,
-  attendanceStatus?: 'present' | 'absent',
-  homeworkGrades?: (string | number)[],
-  examsCount?: number
+export const calculateMonthlyRankingPoints = (
+  behaviorGrades: string[],
+  absenceCount: number,
+  monthlyReviewScore: number | null,
+  examCount: number
 ): RankingPointsCalculation => {
-  const behaviorPoints = behaviorGrade ? calculateBehaviorPoints(behaviorGrade) : 0;
-  const attendancePoints = attendanceStatus ? calculateAttendancePoints(attendanceStatus) : 0;
-  
-  let homeworkPoints: number = 0;
-  if (homeworkGrades && homeworkGrades.length > 0) {
-    // حساب متوسط نقاط المذاكرة
-    const totalHomework = homeworkGrades.reduce<number>((sum, grade) => {
-      return sum + calculateHomeworkPoints(grade);
-    }, 0);
-    homeworkPoints = totalHomework / homeworkGrades.length;
-  }
-  
-  const examPoints = examsCount ? examsCount * 3 : 0;
+  const behaviorPoints = calculateMonthlyBehaviorPoints(behaviorGrades);
+  const attendancePoints = calculateMonthlyAttendancePoints(absenceCount);
+  const homeworkPoints = monthlyReviewScore !== null ? calculateMonthlyReviewPoints(monthlyReviewScore) : 0;
+  const examPoints = calculateExamPoints(examCount);
   
   const totalPoints = behaviorPoints + attendancePoints + homeworkPoints + examPoints;
   

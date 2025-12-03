@@ -179,8 +179,24 @@ const AddStudentWork = ({ student, onClose }: AddStudentWorkProps) => {
     try {
       // تحقق إذا كان الطالب تمهيدي
       if (student.level === 'تمهيدي') {
+        // التحقق من أن جميع التسميعات لها تقدير
+        const invalidRecitations = beginnerRecitations.filter(r => r.page && !r.grade);
+        if (invalidRecitations.length > 0) {
+          toast({
+            title: "خطأ",
+            description: "يجب إضافة التقدير لجميع الصفحات المدخلة",
+            variant: "destructive",
+          });
+          setLoading(false);
+          return;
+        }
+
         // حفظ تسميع الطلاب التمهيديين
-        const beginnerData = beginnerRecitations.filter(r => r.page && r.lineNumbers.length > 0 && r.grade);
+        // إذا لم يتم اختيار سطور، يتم حفظ الصفحة كاملة (10 أسطر)
+        const beginnerData = beginnerRecitations.filter(r => r.page && r.grade).map(r => ({
+          ...r,
+          lineNumbers: r.lineNumbers.length > 0 ? r.lineNumbers : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        }));
         
         if (beginnerData.length > 0) {
           const { error: beginnerError } = await supabase
@@ -239,7 +255,9 @@ const AddStudentWork = ({ student, onClose }: AddStudentWorkProps) => {
           const pointsToSave = [];
           beginnerData.forEach((rec) => {
             const points = getPointsFromGrade(rec.grade);
-            const linesText = rec.lineNumbers.length === 1 
+            const linesText = rec.lineNumbers.length === 10
+              ? 'الصفحة كاملة'
+              : rec.lineNumbers.length === 1 
               ? `السطر ${rec.lineNumbers[0]}` 
               : `الأسطر ${rec.lineNumbers.join('، ')}`;
             pointsToSave.push({
@@ -291,6 +309,42 @@ const AddStudentWork = ({ student, onClose }: AddStudentWorkProps) => {
         setNotes("");
         setGeneralPoints("");
         onClose();
+        setLoading(false);
+        return;
+      }
+
+      // التحقق من أن جميع التسميعات لها تقدير
+      const invalidNewRecitations = newRecitations.filter(r => r.page && !r.grade);
+      if (invalidNewRecitations.length > 0) {
+        toast({
+          title: "خطأ",
+          description: "يجب إضافة التقدير لجميع صفحات التسميع الجديد",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+
+      // التحقق من أن جميع المراجعات لها تقدير
+      const invalidReviews = reviews.filter(r => r.part && !r.grade);
+      if (invalidReviews.length > 0) {
+        toast({
+          title: "خطأ",
+          description: "يجب إضافة التقدير لجميع أجزاء المراجعة",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+
+      // التحقق من أن جميع الأحاديث لها تقدير
+      const invalidHadiths = hadiths.filter(h => h.name && !h.grade);
+      if (invalidHadiths.length > 0) {
+        toast({
+          title: "خطأ",
+          description: "يجب إضافة التقدير لجميع الأحاديث",
+          variant: "destructive",
+        });
         setLoading(false);
         return;
       }

@@ -11,14 +11,22 @@ interface QuranSectionProps {
   title: string;
   recitations: QuranRecitation[];
   icon?: React.ReactNode;
+  displayType?: 'page' | 'juz'; // نوع العرض: صفحة أو جزء
 }
 
-const QuranSection = ({ title, recitations, icon }: QuranSectionProps) => {
+const QuranSection = ({ title, recitations, icon, displayType = 'page' }: QuranSectionProps) => {
   const getGradeColor = (grade: number) => {
     if (grade >= 90) return "bg-gradient-to-r from-green-500 to-green-600";
     if (grade >= 80) return "bg-gradient-to-r from-blue-500 to-blue-600";
     if (grade >= 70) return "bg-gradient-to-r from-yellow-500 to-yellow-600";
     return "bg-gradient-to-r from-gray-500 to-gray-600";
+  };
+
+  const getDisplayLabel = (pageNumber: number) => {
+    if (displayType === 'juz') {
+      return `جزء ${pageNumber}`;
+    }
+    return `صفحة ${pageNumber}`;
   };
 
   return (
@@ -37,7 +45,7 @@ const QuranSection = ({ title, recitations, icon }: QuranSectionProps) => {
             <div className="flex items-center gap-3">
               <CheckCircle className="w-5 h-5 text-primary" />
               <span className="text-lg font-semibold text-foreground">
-                صفحة {recitation.pageNumber}
+                {getDisplayLabel(recitation.pageNumber)}
               </span>
             </div>
             

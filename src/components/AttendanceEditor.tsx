@@ -5,7 +5,6 @@ import { Badge } from "@/components/ui/badge";
 import { UserCheck, UserX, Edit2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { calculateAttendancePoints } from "@/lib/rankingPoints";
 
 interface Student {
   id: string;
@@ -136,15 +135,6 @@ const AttendanceEditor = ({ students, onAttendanceChange }: AttendanceEditorProp
           .maybeSingle();
 
         if (!existingPoints) {
-          // الحصول على نقاط الحماسة التراكمية
-          const { data: allEnthusiasmPoints } = await supabase
-            .from('student_points')
-            .select('points')
-            .eq('student_id', student.id)
-            .eq('point_type', 'enthusiasm');
-          
-          const currentTotal = allEnthusiasmPoints?.reduce((sum, p) => sum + p.points, 0) || 0;
-
           await supabase
             .from('student_points')
             .insert({
@@ -164,18 +154,8 @@ const AttendanceEditor = ({ students, onAttendanceChange }: AttendanceEditorProp
           .eq('point_type', 'enthusiasm');
       }
 
-      // حساب وحفظ النقاط الوهمية للترتيب
-      const rankingPoints = calculateAttendancePoints(newStatus);
-      
-      await supabase
-        .from('student_ranking_points')
-        .upsert({
-          student_id: student.id,
-          date: today,
-          attendance_points: rankingPoints,
-        }, {
-          onConflict: 'student_id,date',
-        });
+      // نقاط الترتيب تُحسب شهرياً وليس يومياً
+      // سيتم حسابها تلقائياً عند نهاية الشهر
 
       toast({
         title: "تم بنجاح",

@@ -767,7 +767,7 @@ const DynamicStudentReport = () => {
                   <div className="flex items-center gap-3 mb-4">
                     <RotateCcw className="w-6 h-6 text-primary" />
                     <h3 className="text-xl font-bold text-primary">المراجعة والتعاهد</h3>
-                    <span className="text-sm text-muted-foreground">({studentData.reviews.length} صفحة)</span>
+                    <span className="text-sm text-muted-foreground">({studentData.reviews.length} جزء)</span>
                   </div>
                   <div className="space-y-3">
                     {studentData.reviews.map((rec: any) => (
@@ -776,7 +776,7 @@ const DynamicStudentReport = () => {
                         className="flex items-center justify-between p-4 bg-muted rounded-xl hover:shadow-md transition-all duration-300 border border-primary/20"
                       >
                         <span className="text-lg font-semibold text-foreground">
-                          صفحة {rec.pageNumber}
+                          جزء {rec.pageNumber}
                         </span>
                         <div className="flex items-center gap-3">
                           <span className="grade-badge bg-gradient-to-r from-primary to-primary/80 text-primary-foreground px-4 py-2 rounded-lg font-bold">

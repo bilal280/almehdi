@@ -148,77 +148,115 @@ const AdminStudentRecords = () => {
 
       const dateFilter = startDate.toISOString().split('T')[0];
 
-      // جلب بيانات الأعمال اليومية
-      let workQuery = supabase
-        .from('student_daily_work')
+      // جلب جميع الطلاب أولاً (استثناء المنقطعين)
+      let studentsQuery = supabase
+        .from('students')
         .select(`
-          student_id,
-          new_recitation_pages,
-          review_pages,
-          hadith_count,
-          students (
-            name,
-            circle_id,
-            circles (
-              name
-            )
+          id,
+          name,
+          circle_id,
+          circles (
+            name
           )
         `)
-        .gte('date', dateFilter);
+        .order('name');
 
-      const { data: workData, error: workError } = await workQuery;
+      if (selectedCircle !== 'all') {
+        studentsQuery = studentsQuery.eq('circle_id', selectedCircle);
+      }
+
+      const { data: allStudents, error: studentsError } = await studentsQuery;
+      if (studentsError) throw studentsError;
+
+      // جلب قائمة الطلاب المنقطعين لاستثنائهم
+      const { data: discontinuedStudents } = await supabase
+        .from('discontinued_students')
+        .select('id');
+      
+      const discontinuedIds = new Set(discontinuedStudents?.map(s => s.id) || []);
+      
+      // تصفية الطلاب لاستثناء المنقطعين
+      const activeStudents = allStudents?.filter(s => !discontinuedIds.has(s.id)) || [];
+
+      // إنشاء Map لجميع الطلاب النشطين
+      const studentMap = new Map<string, StudentSummary>();
+      activeStudents.forEach(student => {
+        studentMap.set(student.id, {
+          student_id: student.id,
+          studentName: student.name,
+          circleName: student.circles?.name || 'غير محدد',
+          totalRecitationPages: 0,
+          totalReviewPages: 0,
+          totalHadithCount: 0,
+          totalExams: 0,
+        });
+      });
+
+      // جلب بيانات الأعمال اليومية
+      const { data: workData, error: workError } = await supabase
+        .from('student_daily_work')
+        .select('student_id, new_recitation_pages, review_pages, hadith_count, new_recitation_grade')
+        .gte('date', dateFilter)
+        .in('student_id', Array.from(studentMap.keys()));
+
       if (workError) throw workError;
 
-      // جلب بيانات الاختبارات
-      let examQuery = supabase
-        .from('student_exams')
-        .select('student_id, id, circle_id')
-        .gte('exam_date', dateFilter);
+      // جلب بيانات تسميعات التمهيديين
+      const { data: beginnerData, error: beginnerError } = await supabase
+        .from('student_beginner_recitations')
+        .select('student_id, page_number, grade')
+        .gte('date', dateFilter)
+        .in('student_id', Array.from(studentMap.keys()));
 
-      const { data: examData, error: examError } = await examQuery;
+      if (beginnerError) throw beginnerError;
+
+      // جلب بيانات الاختبارات
+      const { data: examData, error: examError } = await supabase
+        .from('student_exams')
+        .select('student_id, id')
+        .gte('exam_date', dateFilter)
+        .in('student_id', Array.from(studentMap.keys()));
+
       if (examError) throw examError;
 
-      // دمج البيانات وحساب المجاميع لكل طالب
-      const studentMap = new Map<string, StudentSummary>();
-
+      // إضافة بيانات الأعمال اليومية (استثناء الإعادات)
       workData?.forEach(work => {
-        const studentId = work.student_id;
-        const studentName = work.students?.name || 'غير محدد';
-        const circleId = work.students?.circle_id;
-        const circleName = work.students?.circles?.name || 'غير محدد';
-        
-        // فلترة حسب الحلقة المختارة
-        if (selectedCircle !== 'all' && circleId !== selectedCircle) {
-          return;
+        const summary = studentMap.get(work.student_id);
+        if (summary) {
+          // حساب الصفحات فقط إذا لم تكن إعادة
+          if (work.new_recitation_grade !== 'إعادة') {
+            summary.totalRecitationPages += work.new_recitation_pages || 0;
+          }
+          summary.totalReviewPages += work.review_pages || 0;
+          summary.totalHadithCount += work.hadith_count || 0;
         }
+      });
 
-        if (!studentMap.has(studentId)) {
-          studentMap.set(studentId, {
-            student_id: studentId,
-            studentName,
-            circleName,
-            totalRecitationPages: 0,
-            totalReviewPages: 0,
-            totalHadithCount: 0,
-            totalExams: 0,
-          });
+      // إضافة بيانات التمهيديين (حساب الصفحات الفريدة، استثناء الإعادات)
+      const studentUniquePages = new Map<string, Set<number>>();
+      beginnerData?.forEach(rec => {
+        const summary = studentMap.get(rec.student_id);
+        if (summary && rec.grade !== 'إعادة') {
+          if (!studentUniquePages.has(rec.student_id)) {
+            studentUniquePages.set(rec.student_id, new Set());
+          }
+          studentUniquePages.get(rec.student_id)!.add(rec.page_number);
         }
+      });
 
-        const summary = studentMap.get(studentId)!;
-        summary.totalRecitationPages += work.new_recitation_pages || 0;
-        summary.totalReviewPages += work.review_pages || 0;
-        summary.totalHadithCount += work.hadith_count || 0;
+      // إضافة عدد الصفحات الفريدة للتمهيديين
+      studentUniquePages.forEach((pages, studentId) => {
+        const summary = studentMap.get(studentId);
+        if (summary) {
+          summary.totalRecitationPages += pages.size;
+        }
       });
 
       // إضافة عدد الاختبارات
       examData?.forEach(exam => {
-        const studentId = exam.student_id;
-        if (studentMap.has(studentId)) {
-          // فلترة حسب الحلقة المختارة
-          if (selectedCircle !== 'all' && exam.circle_id !== selectedCircle) {
-            return;
-          }
-          studentMap.get(studentId)!.totalExams += 1;
+        const summary = studentMap.get(exam.student_id);
+        if (summary) {
+          summary.totalExams += 1;
         }
       });
 
@@ -276,7 +314,7 @@ const AdminStudentRecords = () => {
     const startDateStr = startDate.toISOString().split('T')[0];
     const endDateStr = endDate.toISOString().split('T')[0];
 
-    // جلب جميع الطلاب
+    // جلب جميع الطلاب (استثناء المنقطعين)
     let studentsQuery = supabase
       .from('students')
       .select(`
@@ -296,6 +334,16 @@ const AdminStudentRecords = () => {
 
     const { data: students, error: studentsError } = await studentsQuery;
     if (studentsError) throw studentsError;
+
+    // جلب قائمة الطلاب المنقطعين لاستثنائهم
+    const { data: discontinuedStudents } = await supabase
+      .from('discontinued_students')
+      .select('id');
+    
+    const discontinuedIds = new Set(discontinuedStudents?.map(s => s.id) || []);
+    
+    // تصفية الطلاب لاستثناء المنقطعين
+    const activeStudents = students?.filter(s => !discontinuedIds.has(s.id)) || [];
 
     // جلب بيانات الأعمال اليومية
     const { data: dailyWorkData } = await supabase
@@ -347,7 +395,7 @@ const AdminStudentRecords = () => {
     // حساب الإحصائيات لكل طالب
     const summaryRecordsArray: StudentMonthlyRecord[] = [];
 
-    students?.forEach(student => {
+    activeStudents.forEach(student => {
       const studentId = student.id;
       const studentName = student.name;
       const circleName = student.circles?.name || 'غير محدد';
@@ -357,10 +405,18 @@ const AdminStudentRecords = () => {
       let behaviorSum = 0;
       let behaviorCount = 0;
 
-      // من الأعمال اليومية
+      // من الأعمال اليومية (استثناء الإعادات)
       const studentDailyWork = dailyWorkData?.filter(w => w.student_id === studentId) || [];
       studentDailyWork.forEach(work => {
-        totalPages += (work.new_recitation_pages || 0) + (work.review_pages || 0);
+        // حساب صفحات التسميع الجديدة (إذا لم تكن إعادة)
+        if (work.new_recitation_grade !== 'إعادة') {
+          totalPages += (work.new_recitation_pages || 0);
+        }
+        
+        // حساب صفحات المراجعة (إذا لم تكن إعادة)
+        if (work.review_grade !== 'إعادة') {
+          totalPages += (work.review_pages || 0);
+        }
         
         if (work.behavior_grade) {
           const behaviorValue = getBehaviorValue(work.behavior_grade);
@@ -371,9 +427,20 @@ const AdminStudentRecords = () => {
         }
       });
 
-      // من تسميعات التمهيدي
+      // من تسميعات التمهيدي (حساب الصفحات الفريدة فقط، استثناء الإعادات)
       const studentBeginnerWork = beginnerData?.filter(b => b.student_id === studentId) || [];
-      totalPages += studentBeginnerWork.length;
+      
+      // إنشاء مجموعة من الصفحات الفريدة (استثناء الإعادات)
+      const uniquePages = new Set<number>();
+      studentBeginnerWork.forEach(work => {
+        // فقط إذا لم يكن التقييم "إعادة"
+        if (work.grade !== 'إعادة') {
+          uniquePages.add(work.page_number);
+        }
+      });
+      
+      // إضافة عدد الصفحات الفريدة
+      totalPages += uniquePages.size;
 
       // الغيابات
       const absenceCount = attendanceData?.filter(a => a.student_id === studentId).length || 0;
@@ -397,18 +464,31 @@ const AdminStudentRecords = () => {
       const monthlyReviewScore = monthlyReview?.score || null;
 
       // آخر صفحة - نحتاج لجلب رقم الصفحة من new_recitation_page_numbers
-      const lastWork = studentDailyWork[studentDailyWork.length - 1];
       let lastPage = "لا يوجد";
       
-      if (lastWork && lastWork.new_recitation_page_numbers) {
-        // استخراج آخر رقم صفحة من النص
-        const pageNumbers = lastWork.new_recitation_page_numbers.split(',').map((p: string) => p.trim());
-        if (pageNumbers.length > 0) {
-          lastPage = pageNumbers[pageNumbers.length - 1];
+      // البحث عن آخر عمل يومي يحتوي على تسميع
+      for (let i = studentDailyWork.length - 1; i >= 0; i--) {
+        const work = studentDailyWork[i];
+        if (work.new_recitation_page_numbers) {
+          // استخراج آخر رقم صفحة من النص
+          const pageNumbers = work.new_recitation_page_numbers.split(',').map((p: string) => p.trim()).filter((p: string) => p);
+          if (pageNumbers.length > 0) {
+            lastPage = pageNumbers[pageNumbers.length - 1];
+            break;
+          }
+        } else if (work.new_recitation_pages && work.new_recitation_pages > 0) {
+          // في حالة عدم وجود أرقام الصفحات، نعرض عدد الصفحات فقط
+          lastPage = `${work.new_recitation_pages} صفحة`;
+          break;
         }
-      } else if (lastWork && lastWork.new_recitation_pages) {
-        // في حالة عدم وجود أرقام الصفحات، نعرض عدد الصفحات فقط
-        lastPage = `${lastWork.new_recitation_pages} صفحة`;
+      }
+      
+      // إذا لم نجد في الأعمال اليومية، نبحث في تسميعات التمهيدي
+      if (lastPage === "لا يوجد" && studentBeginnerWork.length > 0) {
+        const lastBeginnerWork = studentBeginnerWork[studentBeginnerWork.length - 1];
+        if (lastBeginnerWork.page_number) {
+          lastPage = `صفحة ${lastBeginnerWork.page_number}`;
+        }
       }
 
       summaryRecordsArray.push({

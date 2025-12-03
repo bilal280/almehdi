@@ -93,7 +93,8 @@ const TeacherStudents = () => {
             name,
             age,
             photo_url,
-            circle_id
+            circle_id,
+            level
           )
         `)
         .eq('date', today)

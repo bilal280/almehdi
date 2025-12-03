@@ -75,7 +75,23 @@ const TeacherDashboard = () => {
         .in('circle_id', circleIds);
 
       if (error) throw error;
-      setStudents(data || []);
+
+      // جلب سجلات الحضور لليوم
+      const today = new Date().toISOString().split('T')[0];
+      const { data: attendanceData, error: attendanceError } = await supabase
+        .from('student_attendance')
+        .select('student_id')
+        .eq('date', today);
+
+      if (attendanceError) throw attendanceError;
+
+      // إنشاء مجموعة من معرفات الطلاب الذين لديهم حضور/غياب مسجل اليوم
+      const studentsWithAttendance = new Set(attendanceData?.map(a => a.student_id) || []);
+
+      // تصفية الطلاب لإخفاء من لديهم حضور/غياب مسجل
+      const filteredStudents = data?.filter(student => !studentsWithAttendance.has(student.id)) || [];
+
+      setStudents(filteredStudents);
     } catch (error) {
       console.error('Error fetching students:', error);
       toast({
@@ -117,6 +133,9 @@ const TeacherDashboard = () => {
         title: "تم بنجاح",
         description: `تم تسجيل ${status === 'present' ? 'حضور' : 'غياب'} ${student.name}`,
       });
+
+      // إزالة الطالب من القائمة بعد تسجيل الحضور/الغياب
+      setStudents(prevStudents => prevStudents.filter(s => s.id !== student.id));
 
       if (status === "present") {
         setSelectedStudent(student);

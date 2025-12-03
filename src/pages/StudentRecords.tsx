@@ -197,60 +197,103 @@ const StudentRecords = () => {
       return;
     }
 
+    // جلب جميع الطلاب في حلقات الأستاذ (استثناء المنقطعين)
+    const { data: allStudents, error: studentsError } = await supabase
+      .from('students')
+      .select('id, name')
+      .in('circle_id', circleIds)
+      .order('name');
+
+    if (studentsError) throw studentsError;
+
+    // جلب قائمة الطلاب المنقطعين لاستثنائهم
+    const { data: discontinuedStudents } = await supabase
+      .from('discontinued_students')
+      .select('id');
+    
+    const discontinuedIds = new Set(discontinuedStudents?.map(s => s.id) || []);
+    
+    // تصفية الطلاب لاستثناء المنقطعين
+    const activeStudents = allStudents?.filter(s => !discontinuedIds.has(s.id)) || [];
+
+    // إنشاء Map لجميع الطلاب النشطين
+    const studentMap = new Map<string, any>();
+    activeStudents.forEach(student => {
+      studentMap.set(student.id, {
+        student_id: student.id,
+        studentName: student.name,
+        totalRecitationPages: 0,
+        totalReviewPages: 0,
+        totalHadithCount: 0,
+        totalExams: 0,
+      });
+    });
+
     // جلب بيانات الأعمال اليومية
     const { data: workData, error: workError } = await supabase
       .from('student_daily_work')
-      .select(`
-        student_id,
-        new_recitation_pages,
-        review_pages,
-        hadith_count,
-        students!inner (
-          name,
-          circle_id
-        )
-      `)
+      .select('student_id, new_recitation_pages, review_pages, hadith_count, new_recitation_grade')
       .gte('date', dateFilter)
-      .in('students.circle_id', circleIds);
+      .in('student_id', Array.from(studentMap.keys()));
 
     if (workError) throw workError;
+
+    // جلب بيانات تسميعات التمهيديين
+    const { data: beginnerData, error: beginnerError } = await supabase
+      .from('student_beginner_recitations')
+      .select('student_id, page_number, grade')
+      .gte('date', dateFilter)
+      .in('student_id', Array.from(studentMap.keys()));
+
+    if (beginnerError) throw beginnerError;
 
     // جلب بيانات الاختبارات
     const { data: examData, error: examError } = await supabase
       .from('student_exams')
       .select('student_id, id')
-      .gte('exam_date', dateFilter);
+      .gte('exam_date', dateFilter)
+      .in('student_id', Array.from(studentMap.keys()));
 
     if (examError) throw examError;
 
-    // دمج البيانات
-    const studentMap = new Map<string, any>();
-
+    // إضافة بيانات الأعمال اليومية (استثناء الإعادات)
     workData?.forEach(work => {
-      const studentId = work.student_id;
-      const studentName = work.students?.name || 'غير محدد';
-      
-      if (!studentMap.has(studentId)) {
-        studentMap.set(studentId, {
-          student_id: studentId,
-          studentName,
-          totalRecitationPages: 0,
-          totalReviewPages: 0,
-          totalHadithCount: 0,
-          totalExams: 0,
-        });
+      const summary = studentMap.get(work.student_id);
+      if (summary) {
+        // حساب الصفحات فقط إذا لم تكن إعادة
+        if (work.new_recitation_grade !== 'إعادة') {
+          summary.totalRecitationPages += work.new_recitation_pages || 0;
+        }
+        summary.totalReviewPages += work.review_pages || 0;
+        summary.totalHadithCount += work.hadith_count || 0;
       }
-
-      const summary = studentMap.get(studentId)!;
-      summary.totalRecitationPages += work.new_recitation_pages || 0;
-      summary.totalReviewPages += work.review_pages || 0;
-      summary.totalHadithCount += work.hadith_count || 0;
     });
 
+    // إضافة بيانات التمهيديين (حساب الصفحات الفريدة، استثناء الإعادات)
+    const studentUniquePages = new Map<string, Set<number>>();
+    beginnerData?.forEach(rec => {
+      const summary = studentMap.get(rec.student_id);
+      if (summary && rec.grade !== 'إعادة') {
+        if (!studentUniquePages.has(rec.student_id)) {
+          studentUniquePages.set(rec.student_id, new Set());
+        }
+        studentUniquePages.get(rec.student_id)!.add(rec.page_number);
+      }
+    });
+
+    // إضافة عدد الصفحات الفريدة للتمهيديين
+    studentUniquePages.forEach((pages, studentId) => {
+      const summary = studentMap.get(studentId);
+      if (summary) {
+        summary.totalRecitationPages += pages.size;
+      }
+    });
+
+    // إضافة عدد الاختبارات
     examData?.forEach(exam => {
-      const studentId = exam.student_id;
-      if (studentMap.has(studentId)) {
-        studentMap.get(studentId)!.totalExams += 1;
+      const summary = studentMap.get(exam.student_id);
+      if (summary) {
+        summary.totalExams += 1;
       }
     });
 
@@ -355,28 +398,50 @@ const StudentRecords = () => {
 
     if (pointsError) throw pointsError;
 
-    // معالجة البيانات
+    // معالجة البيانات (استثناء الإعادات من حساب الصفحات)
     workData?.forEach(work => {
       const record = studentRecordsMap.get(work.student_id);
       if (record) {
-        record.totalPages += work.new_recitation_pages || 0;
+        // حساب الصفحات فقط إذا لم تكن إعادة
+        if (work.new_recitation_grade !== 'إعادة') {
+          record.totalPages += work.new_recitation_pages || 0;
+        }
+        
+        // حساب عدد الإعادات
         if (work.new_recitation_grade === 'إعادة') {
           record.retakeCount++;
         }
       }
     });
 
-    // معالجة الطلاب التمهيديين
+    // معالجة الطلاب التمهيديين (حساب الصفحات الفريدة فقط، استثناء الإعادات)
     const studentLastPages = new Map<string, number>();
+    const studentUniquePages = new Map<string, Set<number>>();
+    
     beginnerData?.forEach(rec => {
       const record = studentRecordsMap.get(rec.student_id);
       if (record) {
-        // حساب الصفحات للطلاب التمهيديين (يمكن حساب كل 15 سطر = صفحة)
-        record.totalPages += 1;
+        // تتبع آخر صفحة
         studentLastPages.set(rec.student_id, rec.page_number);
+        
+        // حساب الإعادات
         if (rec.grade === 'إعادة') {
           record.retakeCount++;
+        } else {
+          // حساب الصفحات الفريدة (فقط غير الإعادات)
+          if (!studentUniquePages.has(rec.student_id)) {
+            studentUniquePages.set(rec.student_id, new Set());
+          }
+          studentUniquePages.get(rec.student_id)!.add(rec.page_number);
         }
+      }
+    });
+
+    // إضافة عدد الصفحات الفريدة لكل طالب تمهيدي
+    studentUniquePages.forEach((pages, studentId) => {
+      const record = studentRecordsMap.get(studentId);
+      if (record) {
+        record.totalPages += pages.size;
       }
     });
 
@@ -571,7 +636,6 @@ const StudentRecords = () => {
                       <TableHead className="text-center font-bold">الاختبارات</TableHead>
                       <TableHead className="text-center font-bold">الإعادات</TableHead>
                       <TableHead className="text-center font-bold">تقييم الأدب</TableHead>
-                      <TableHead className="text-center font-bold">النقاط</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -611,11 +675,6 @@ const StudentRecords = () => {
                             'bg-muted text-muted-foreground'
                           }`}>
                             {record.behaviorAverage}
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <span className="inline-flex items-center justify-center px-3 py-1 rounded-full bg-accent/10 text-accent font-bold">
-                            {record.totalPoints}
                           </span>
                         </TableCell>
                       </TableRow>
