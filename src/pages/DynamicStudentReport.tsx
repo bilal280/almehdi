@@ -10,7 +10,7 @@ import IslamicTime from "@/components/IslamicTime";
 import PointsSection from "@/components/PointsSection";
 import ExamSection from "@/components/ExamSection";
 import MonthlyReviewSection from "@/components/MonthlyReviewSection";
-import { RotateCcw, BookOpen, AlertCircle, ArrowLeft, FileText } from "lucide-react";
+import { RotateCcw, BookOpen, AlertCircle, ArrowLeft, FileText, ChevronLeft, ChevronRight, ClipboardList } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -31,12 +31,26 @@ const DynamicStudentReport = () => {
   const [records, setRecords] = useState<any[]>([]);
   const [loadingRecords, setLoadingRecords] = useState(false);
   const [currentStudentId, setCurrentStudentId] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [availableDates, setAvailableDates] = useState<{value: string, label: string, dayName: string, isToday?: boolean}[]>([]);
+  const [dateChanging, setDateChanging] = useState(false);
+  const [allExams, setAllExams] = useState<any[]>([]);
+  const [loadingExams, setLoadingExams] = useState(false);
+  const [examsDialogOpen, setExamsDialogOpen] = useState(false);
 
   useEffect(() => {
     if (studentNumber) {
+      generateAvailableDates();
       fetchStudentData();
     }
   }, [studentNumber]);
+
+  useEffect(() => {
+    if (studentNumber && selectedDate) {
+      setDateChanging(true);
+      fetchStudentData().finally(() => setDateChanging(false));
+    }
+  }, [selectedDate]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -50,6 +64,74 @@ const DynamicStudentReport = () => {
   const getDayName = (date: Date) => {
     const days = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
     return days[date.getDay()];
+  };
+
+  const generateAvailableDates = () => {
+    const dates = [];
+    const today = new Date();
+    
+    // إنشاء قائمة بالأيام السابقة لمدة أسبوع (أيام الدوام: السبت إلى الأربعاء)
+    for (let i = 0; i < 14; i++) { // أسبوعين للتأكد من وجود أيام دوام كافية
+      const date = new Date(today);
+      date.setDate(today.getDate() - i);
+      
+      const dayOfWeek = date.getDay();
+      // أيام الدوام: السبت (6), الأحد (0), الاثنين (1), الثلاثاء (2), الأربعاء (3)
+      if (dayOfWeek >= 0 && dayOfWeek <= 3 || dayOfWeek === 6) {
+        const dateStr = date.toISOString().split('T')[0];
+        dates.push(dateStr);
+      }
+      
+      // توقف عند الحصول على 7 أيام دوام
+      if (dates.length >= 7) break;
+    }
+    
+    setAvailableDates(dates.map(dateStr => ({
+      value: dateStr,
+      label: '',
+      dayName: '',
+      isToday: false
+    })));
+  };
+
+  const getCurrentDateInfo = () => {
+    const date = new Date(selectedDate);
+    const dayName = getDayName(date);
+    const formattedDate = date.toLocaleDateString('ar-EG', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+    const isToday = selectedDate === new Date().toISOString().split('T')[0];
+    
+    return { dayName, formattedDate, isToday };
+  };
+
+  const navigateDate = (direction: 'prev' | 'next') => {
+    const currentDate = new Date(selectedDate);
+    const newDate = new Date(currentDate);
+    
+    if (direction === 'prev') {
+      // البحث عن اليوم السابق من أيام الدوام
+      do {
+        newDate.setDate(newDate.getDate() - 1);
+      } while (![0, 1, 2, 3, 6].includes(newDate.getDay()));
+    } else {
+      // البحث عن اليوم التالي من أيام الدوام
+      do {
+        newDate.setDate(newDate.getDate() + 1);
+      } while (![0, 1, 2, 3, 6].includes(newDate.getDay()));
+    }
+    
+    const newDateStr = newDate.toISOString().split('T')[0];
+    const today = new Date().toISOString().split('T')[0];
+    
+    // لا نسمح بالذهاب لتاريخ مستقبلي
+    if (direction === 'next' && newDateStr > today) {
+      return;
+    }
+    
+    setSelectedDate(newDateStr);
   };
 
   const fetchStudentData = async () => {
@@ -82,13 +164,13 @@ const DynamicStudentReport = () => {
       const studentId = student.id;
       setCurrentStudentId(studentId);
 
-      // التحقق من حضور الطالب اليوم
-      const today = new Date().toISOString().split('T')[0];
+      // التحقق من حضور الطالب في التاريخ المحدد
+      const targetDate = selectedDate;
       const { data: attendance } = await supabase
         .from('student_attendance')
         .select('status')
         .eq('student_id', studentId)
-        .eq('date', today)
+        .eq('date', targetDate)
         .maybeSingle();
 
       const isPresent = attendance?.status === 'present';
@@ -104,7 +186,7 @@ const DynamicStudentReport = () => {
           .from('student_daily_work')
           .select('*')
           .eq('student_id', studentId)
-          .eq('date', today)
+          .eq('date', targetDate)
           .maybeSingle();
 
         dailyWork = work;
@@ -116,19 +198,19 @@ const DynamicStudentReport = () => {
             .from('student_beginner_recitations')
             .select('*')
             .eq('student_id', studentId)
-            .eq('date', today)
+            .eq('date', targetDate)
             .order('created_at', { ascending: true });
           
           beginnerRecitations = beginnerData || [];
         }
       }
 
-      // جلب نشاطات الحلقة لهذا اليوم
+      // جلب نشاطات الحلقة للتاريخ المحدد
       const { data: circleActivities } = await supabase
         .from('circle_daily_activities')
         .select('*')
         .eq('circle_id', student.circle_id)
-        .eq('date', today);
+        .eq('date', targetDate);
 
       // جلب النقاط التراكمية
       const { data: allEnthusiasmPoints } = await supabase
@@ -148,12 +230,12 @@ const DynamicStudentReport = () => {
       const generalPoints = allGeneralPoints?.reduce((sum, p) => sum + p.points, 0) || 0;
       setTotalPoints(generalPoints);
 
-      // جلب نتائج الاختبارات - اليوم فقط
+      // جلب نتائج الاختبارات للتاريخ المحدد
       const { data: exams } = await supabase
         .from('student_exams')
         .select('*')
         .eq('student_id', studentId)
-        .eq('exam_date', today)
+        .eq('exam_date', targetDate)
         .order('created_at', { ascending: false });
 
       // جلب المذاكرة الشهرية للشهر الحالي
@@ -217,8 +299,8 @@ const DynamicStudentReport = () => {
         name: student.name,
         photoUrl: student.photo_url,
         level: student.level || "تلاوة",
-        date: today,
-        dayName: getDayName(new Date()),
+        date: targetDate,
+        dayName: getDayName(new Date(targetDate)),
         instituteName: "معهد المهدي",
         teacherName: student.circles?.teachers?.name || "غير محدد",
         className: student.circles?.name || "غير محدد",
@@ -248,12 +330,14 @@ const DynamicStudentReport = () => {
     }
   };
 
-  if (loading) {
+  if (loading || dateChanging) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">جاري تحميل بيانات الطالب...</p>
+          <p className="text-muted-foreground">
+            {loading ? 'جاري تحميل بيانات الطالب...' : 'جاري تحديث البيانات...'}
+          </p>
         </div>
       </div>
     );
@@ -297,11 +381,45 @@ const DynamicStudentReport = () => {
             dayName={studentData.dayName}
           />
           
+          {/* اختيار التاريخ */}
+          <div className="islamic-card p-4 mb-4">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+              <span className="text-lg font-bold text-primary">
+                المستوى: {studentData.level}
+              </span>
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-medium text-muted-foreground">اختر التاريخ:</span>
+                <Select value={selectedDate} onValueChange={setSelectedDate}>
+                  <SelectTrigger className="w-[200px]">
+                    <SelectValue placeholder="اختر التاريخ" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableDates.map((date) => (
+                      <SelectItem key={date.value} value={date.value}>
+                        <div className="flex flex-col text-right">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{date.dayName}</span>
+                            {date.isToday && (
+                              <span className="text-xs bg-primary text-primary-foreground px-2 py-1 rounded-full">
+                                اليوم
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-xs text-muted-foreground">{date.label}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+          
           <div className="mt-8 space-y-6">
             <Alert className="bg-red-50 border-red-200">
               <AlertCircle className="h-4 w-4 text-red-600" />
               <AlertDescription className="text-center text-lg text-red-700 font-bold">
-                الطالب غائب اليوم - لا توجد أنشطة مسجلة
+                الطالب غائب في هذا اليوم - لا توجد أنشطة مسجلة
               </AlertDescription>
             </Alert>
             
@@ -345,11 +463,50 @@ const DynamicStudentReport = () => {
             dayName={studentData.dayName}
           />
           
+          {/* التنقل بين التواريخ */}
+          <div className="islamic-card p-4 mb-4">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+              <span className="text-lg font-bold text-primary">
+                المستوى: {studentData.level}
+              </span>
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigateDate('prev')}
+                  className="p-2"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+                <div className="text-center min-w-[200px]">
+                  <div className="flex items-center justify-center gap-2">
+                    <span className="font-bold text-lg">{getCurrentDateInfo().dayName}</span>
+                    {getCurrentDateInfo().isToday && (
+                      <span className="text-xs bg-primary text-primary-foreground px-2 py-1 rounded-full">
+                        اليوم
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-sm text-muted-foreground">{getCurrentDateInfo().formattedDate}</span>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigateDate('next')}
+                  disabled={selectedDate >= new Date().toISOString().split('T')[0]}
+                  className="p-2"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
+          
           <div className="mt-8 space-y-6">
             <Alert className="bg-yellow-50 border-yellow-200">
               <AlertCircle className="h-4 w-4 text-yellow-600" />
               <AlertDescription className="text-center text-lg text-yellow-700 font-semibold">
-                لم يتم تسجيل بيانات الطالب بعد
+                لم يتم تسجيل بيانات الطالب في هذا اليوم
               </AlertDescription>
             </Alert>
             
@@ -529,6 +686,39 @@ const DynamicStudentReport = () => {
     return "غير محدد";
   };
 
+  const fetchAllExams = async () => {
+    if (!currentStudentId) return;
+    
+    setLoadingExams(true);
+    try {
+      const { data, error } = await supabase
+        .from('student_exams')
+        .select('*')
+        .eq('student_id', currentStudentId)
+        .order('exam_date', { ascending: false });
+
+      if (error) throw error;
+      setAllExams(data || []);
+    } catch (error) {
+      console.error('Error fetching all exams:', error);
+    } finally {
+      setLoadingExams(false);
+    }
+  };
+
+  const getExamSection = (exam: any): string => {
+    if (exam.tamhidi_stage) return exam.tamhidi_stage;
+    if (exam.tilawah_section) return exam.tilawah_section;
+    if (exam.hifd_section) return exam.hifd_section;
+    if (exam.juz_number) return `الجزء ${exam.juz_number}`;
+    return '-';
+  };
+
+  const handleOpenExamsDialog = () => {
+    setExamsDialogOpen(true);
+    fetchAllExams();
+  };
+
   const months = [
     { value: "0", label: "يناير" },
     { value: "1", label: "فبراير" },
@@ -551,18 +741,19 @@ const DynamicStudentReport = () => {
         <div className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-primary via-primary to-primary/90 backdrop-blur-md shadow-2xl border-b-2 border-primary-foreground/30 animate-in slide-in-from-top duration-500">
           <div className="container mx-auto px-4 py-4 flex justify-between items-center gap-4">
             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary-foreground/5 to-transparent animate-pulse"></div>
-            <Sheet>
-              <SheetTrigger asChild>
-                <Button variant="secondary" size="sm" className="relative flex items-center gap-2 hover:scale-105 transition-transform duration-300 shadow-lg">
-                  <FileText className="w-4 h-4 animate-pulse" />
-                  المحصلات
-                  <span className="absolute -top-1 -right-1 w-2 h-2 bg-accent rounded-full animate-ping"></span>
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto">
-                <SheetHeader>
-                  <SheetTitle>المحصلات الشهرية والفصلية</SheetTitle>
-                </SheetHeader>
+            <div className="flex items-center gap-2 relative z-10">
+              <Sheet>
+                <SheetTrigger asChild>
+                  <Button variant="secondary" size="sm" className="relative flex items-center gap-2 hover:scale-105 transition-transform duration-300 shadow-lg">
+                    <FileText className="w-4 h-4 animate-pulse" />
+                    المحصلات
+                    <span className="absolute -top-1 -right-1 w-2 h-2 bg-accent rounded-full animate-ping"></span>
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto">
+                  <SheetHeader>
+                    <SheetTitle>المحصلات الشهرية والفصلية</SheetTitle>
+                  </SheetHeader>
                 <div className="mt-6 space-y-6">
                   <Tabs value={selectedView} onValueChange={(v) => setSelectedView(v as 'monthly' | 'quarterly')}>
                     <TabsList className="grid w-full grid-cols-2">
@@ -629,6 +820,102 @@ const DynamicStudentReport = () => {
               </SheetContent>
             </Sheet>
 
+            <Sheet open={examsDialogOpen} onOpenChange={setExamsDialogOpen}>
+              <SheetTrigger asChild>
+                <Button 
+                  variant="secondary" 
+                  size="sm"
+                  onClick={handleOpenExamsDialog}
+                  className="relative flex items-center gap-2 hover:scale-105 transition-transform duration-300 shadow-lg"
+                >
+                  <ClipboardList className="w-4 h-4 animate-pulse" />
+                  اختباراتي
+                  <span className="absolute -top-1 -right-1 w-2 h-2 bg-accent rounded-full animate-ping"></span>
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="right" className="w-full sm:max-w-3xl overflow-y-auto">
+                <SheetHeader>
+                  <SheetTitle className="text-right">جميع اختباراتي</SheetTitle>
+                </SheetHeader>
+                <div className="mt-6">
+                  {loadingExams ? (
+                    <div className="text-center py-8">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                      <p className="text-muted-foreground mt-4">جاري تحميل الاختبارات...</p>
+                    </div>
+                  ) : allExams.length === 0 ? (
+                    <div className="text-center py-8">
+                      <ClipboardList className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+                      <p className="text-muted-foreground">لا توجد اختبارات مسجلة</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto" dir="rtl">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="text-right">التاريخ</TableHead>
+                            <TableHead className="text-right">القسم/المرحلة</TableHead>
+                            <TableHead className="text-right">المحاولة</TableHead>
+                            <TableHead className="text-right">العلامة</TableHead>
+                            <TableHead className="text-right">التقييم</TableHead>
+                            <TableHead className="text-right">التجويد</TableHead>
+                            <TableHead className="text-right">حفظ السور</TableHead>
+                            <TableHead className="text-right">إضافي</TableHead>
+                            <TableHead className="text-right">ملاحظات</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {allExams.map((exam) => (
+                            <TableRow key={exam.id}>
+                              <TableCell className="text-right">
+                                {new Date(exam.exam_date).toLocaleDateString('ar-EG')}
+                              </TableCell>
+                              <TableCell className="text-right font-medium">
+                                {getExamSection(exam)}
+                              </TableCell>
+                              <TableCell className="text-right">{exam.attempt_number}</TableCell>
+                              <TableCell className="text-right font-bold">
+                                {exam.exam_score !== null ? exam.exam_score : '-'}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                  exam.grade === 'ممتاز' ? 'bg-green-100 text-green-800' :
+                                  exam.grade === 'جيد جداً' ? 'bg-blue-100 text-blue-800' :
+                                  exam.grade === 'جيد' ? 'bg-yellow-100 text-yellow-800' :
+                                  exam.grade === 'مقبول' ? 'bg-orange-100 text-orange-800' :
+                                  exam.grade === 'إعادة' ? 'bg-red-100 text-red-800' :
+                                  'bg-gray-100 text-gray-800'
+                                }`}>
+                                  {exam.grade || '-'}
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {exam.tajweed_score !== null ? `${exam.tajweed_score}/10` : '-'}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {exam.surah_memory_score !== null ? `${exam.surah_memory_score}/10` : '-'}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {studentData.level === 'تلاوة' && exam.tafsir_score !== null ? (
+                                  <span className="text-xs">تفسير: {exam.tafsir_score}/10</span>
+                                ) : studentData.level === 'حافظ' && exam.stability_score !== null ? (
+                                  <span className="text-xs">ثبات: {exam.stability_score}/10</span>
+                                ) : '-'}
+                              </TableCell>
+                              <TableCell className="text-right max-w-xs truncate">
+                                {exam.notes || '-'}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </div>
+              </SheetContent>
+            </Sheet>
+            </div>
+
             <div className="relative z-10 text-primary-foreground font-bold text-lg flex items-center gap-2 bg-primary-foreground/10 px-4 py-2 rounded-full backdrop-blur-sm border border-primary-foreground/20 hover:bg-primary-foreground/20 transition-all duration-300">
               <span className="text-sm hidden sm:inline">النقاط العامة:</span>
               <span className="text-xl sm:text-2xl animate-pulse">{totalPoints}</span>
@@ -663,11 +950,43 @@ const DynamicStudentReport = () => {
           dayName={studentData.dayName}
         />
         
-        {/* مستوى الطالب */}
-        <div className="islamic-card p-4 text-center mb-4">
-          <span className="text-lg font-bold text-primary">
-            المستوى: {studentData.level}
-          </span>
+        {/* التنقل بين التواريخ */}
+        <div className="islamic-card p-4 mb-4">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <span className="text-lg font-bold text-primary">
+              المستوى: {studentData.level}
+            </span>
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigateDate('prev')}
+                className="p-2"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+              <div className="text-center min-w-[200px]">
+                <div className="flex items-center justify-center gap-2">
+                  <span className="font-bold text-lg">{getCurrentDateInfo().dayName}</span>
+                  {getCurrentDateInfo().isToday && (
+                    <span className="text-xs bg-primary text-primary-foreground px-2 py-1 rounded-full">
+                      اليوم
+                    </span>
+                  )}
+                </div>
+                <span className="text-sm text-muted-foreground">{getCurrentDateInfo().formattedDate}</span>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigateDate('next')}
+                disabled={selectedDate >= new Date().toISOString().split('T')[0]}
+                className="p-2"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
         </div>
         
         <div className="grid gap-6">

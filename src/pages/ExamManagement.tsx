@@ -32,6 +32,7 @@ const ExamManagement = () => {
   
   // حقول مشتركة
   const [attemptNumber, setAttemptNumber] = useState("");
+  const [examDate, setExamDate] = useState(new Date().toISOString().split('T')[0]);
   const [examScore, setExamScore] = useState("");
   const [grade, setGrade] = useState("");
   const [tajweedScore, setTajweedScore] = useState("");
@@ -127,7 +128,7 @@ const ExamManagement = () => {
     e.preventDefault();
     
     // التحقق من الحقول المطلوبة حسب المستوى
-    if (!selectedCircleId || !selectedStudentId || !attemptNumber) {
+    if (!selectedCircleId || !selectedStudentId || !attemptNumber || !examDate) {
       toast({
         title: "خطأ",
         description: "يرجى ملء جميع الحقول المطلوبة",
@@ -175,7 +176,7 @@ const ExamManagement = () => {
         tajweed_score: tajweedScore ? parseFloat(tajweedScore) : null,
         surah_memory_score: surahMemoryScore ? parseFloat(surahMemoryScore) : null,
         notes: notes || null,
-        exam_date: new Date().toISOString().split('T')[0]
+        exam_date: examDate
       };
 
       // إضافة الحقول حسب مستوى الطالب
@@ -224,6 +225,7 @@ const ExamManagement = () => {
 
   const resetForm = () => {
     setAttemptNumber("");
+    setExamDate(new Date().toISOString().split('T')[0]);
     setExamScore("");
     setGrade("");
     setTajweedScore("");
@@ -329,6 +331,7 @@ const ExamManagement = () => {
                           <SelectItem value="مرحلة السكون">مرحلة السكون</SelectItem>
                           <SelectItem value="مرحلة الشدة">مرحلة الشدة</SelectItem>
                           <SelectItem value="مرحلة التنوين">مرحلة التنوين</SelectItem>
+                          <SelectItem value="مرحلة المدود">مرحلة المدود</SelectItem>
                           <SelectItem value="مرحلة همزة الوصل">مرحلة همزة الوصل</SelectItem>
                           <SelectItem value="مرحلة كامل">مرحلة كامل</SelectItem>
                           <SelectItem value="أخرى">أخرى</SelectItem>
@@ -396,6 +399,18 @@ const ExamManagement = () => {
                       </Select>
                     </div>
                   )}
+
+                  {/* تاريخ الاختبار */}
+                  <div className="space-y-2">
+                    <Label htmlFor="examDate" className="text-right block">تاريخ الاختبار *</Label>
+                    <Input
+                      id="examDate"
+                      type="date"
+                      value={examDate}
+                      onChange={(e) => setExamDate(e.target.value)}
+                      className="text-right"
+                    />
+                  </div>
 
                   {/* رقم المحاولة */}
                   <div className="space-y-2">

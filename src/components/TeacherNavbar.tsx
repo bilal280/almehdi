@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from "react-router-dom";
-import { Home, Users, BookOpen, FileText, LogOut, User, Award, Menu } from "lucide-react";
+import { Home, Users, BookOpen, FileText, LogOut, User, Award, Menu, ClipboardList } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -16,9 +16,11 @@ const TeacherNavbar = () => {
 
   const navItems = [
     { to: "/teacher", icon: Home, label: "الرئيسية", exact: true },
+    { to: "/teacher/quick-entry", icon: FileText, label: "إدخال سريع", exact: false },
     { to: "/teacher/students", icon: Users, label: "إدارة الطلاب" },
     { to: "/teacher/activities", icon: BookOpen, label: "أعمال الحلقة" },
     { to: "/teacher/records", icon: FileText, label: "السجلات" },
+    { to: "/teacher/exam-records", icon: ClipboardList, label: "سجلات الاختبارات" },
     { to: "/teacher/monthly-review", icon: Award, label: "المذاكرة الشهرية" },
   ];
 
@@ -33,7 +35,7 @@ const TeacherNavbar = () => {
             </div>
             <div>
               <h1 className="text-2xl font-bold text-secondary-foreground text-glow">لوحة الأستاذ</h1>
-              <p className="text-sm text-secondary-foreground/80">أستاذ محمد</p>
+             
             </div>
           </div>
 

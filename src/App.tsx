@@ -6,7 +6,10 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import MaintenanceCheck from "./components/MaintenanceCheck";
 import DynamicStudentReport from "./pages/DynamicStudentReport";
 import TeacherDashboard from "./pages/TeacherDashboard";
+import QuickDataEntry from "./pages/QuickDataEntry";
 import TeacherStudents from "./pages/TeacherStudents";
+import TeacherExamRecords from "./pages/TeacherExamRecords";
+
 import Login from "./pages/Login";
 import CircleActivities from "./pages/CircleActivities";
 import StudentRecords from "./pages/StudentRecords";
@@ -52,9 +55,11 @@ const App = () => (
           {/* صفحات الأساتذة */}
           <Route path="/teacher" element={<TeacherDashboard />} />
           <Route path="/teacher/students" element={<TeacherStudents />} />
+          <Route path="/teacher/quick-entry" element={<QuickDataEntry />} />
           <Route path="/teacher/activities" element={<CircleActivities />} />
           <Route path="/teacher/records" element={<StudentRecords />} /> 
           <Route path="/teacher/exams" element={<ExamManagement />} />
+          <Route path="/teacher/exam-records" element={<TeacherExamRecords />} />
           <Route path="/teacher/monthly-review" element={<MonthlyReview />} />
           
           {/* صفحات الأدمن */}
