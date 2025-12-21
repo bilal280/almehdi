@@ -20,14 +20,24 @@ interface StudentMonthlyRecord {
   totalPoints: number;
 }
 
+interface StudentWeeklyRecord {
+  student_id: string;
+  studentName: string;
+  totalPages: number;
+  absenceCount: number;
+  lastPage: string;
+  examsCount: number;
+  rankingScore: number;
+}
+
 const StudentRecords = () => {
   const [selectedView, setSelectedView] = useState<'weekly' | 'monthly' | 'quarterly' | 'monthWeeks'>('weekly');
   const [selectedMonth, setSelectedMonth] = useState<string>(new Date().getMonth().toString());
   const [selectedYear, setSelectedYear] = useState<string>(new Date().getFullYear().toString());
-  const [weeklyRecords, setWeeklyRecords] = useState<{weekNumber: number, weekLabel: string, records: StudentMonthlyRecord[]}[]>([]);
+  const [weeklyRecords, setWeeklyRecords] = useState<{weekNumber: number, weekLabel: string, records: StudentWeeklyRecord[]}[]>([]);
   const [availableMonths, setAvailableMonths] = useState<{value: string, label: string}[]>([]);
   const [availableYears, setAvailableYears] = useState<string[]>([]);
-  const [records, setRecords] = useState<StudentMonthlyRecord[]>([]);
+  const [records, setRecords] = useState<StudentMonthlyRecord[] | StudentWeeklyRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
@@ -231,7 +241,7 @@ const StudentRecords = () => {
     setWeeklyRecords(allWeeklyRecords);
   };
 
-  const fetchWeekRecords = async (teacherId: string, startDate: Date, endDate: Date) => {
+  const fetchWeekRecords = async (teacherId: string, startDate: Date, endDate: Date): Promise<StudentWeeklyRecord[]> => {
     const startDateStr = startDate.toISOString().split('T')[0];
     const endDateStr = endDate.toISOString().split('T')[0];
 
@@ -262,7 +272,7 @@ const StudentRecords = () => {
     const activeStudents = allStudents?.filter(s => !discontinuedIds.has(s.id)) || [];
 
     // إنشاء Map لجميع الطلاب النشطين
-    const studentMap = new Map<string, any>();
+    const studentMap = new Map<string, StudentWeeklyRecord>();
     activeStudents.forEach(student => {
       studentMap.set(student.id, {
         student_id: student.id,
@@ -271,9 +281,7 @@ const StudentRecords = () => {
         absenceCount: 0,
         lastPage: "لا يوجد",
         examsCount: 0,
-        retakeCount: 0,
-        behaviorAverage: "-",
-        totalPoints: 0,
+        rankingScore: 0,
       });
     });
 
@@ -293,11 +301,38 @@ const StudentRecords = () => {
       .lte('date', endDateStr)
       .in('student_id', Array.from(studentMap.keys()));
 
+    // جلب الغيابات
+    const { data: attendanceData } = await supabase
+      .from('student_attendance')
+      .select('*')
+      .eq('status', 'غائب')
+      .gte('date', startDateStr)
+      .lte('date', endDateStr)
+      .in('student_id', Array.from(studentMap.keys()));
+
+    // جلب الاختبارات
+    const { data: examData } = await supabase
+      .from('student_exams')
+      .select('*')
+      .gte('exam_date', startDateStr)
+      .lte('exam_date', endDateStr)
+      .in('student_id', Array.from(studentMap.keys()));
+
     // معالجة البيانات
+    const studentLastPages = new Map<string, string>();
+    
     workData?.forEach(work => {
       const summary = studentMap.get(work.student_id);
       if (summary && work.new_recitation_grade !== 'إعادة') {
         summary.totalPages += work.new_recitation_pages || 0;
+        
+        // تتبع آخر صفحة
+        if (work.new_recitation_page_numbers) {
+          const pageNumbers = work.new_recitation_page_numbers.split(',').map((p: string) => p.trim()).filter((p: string) => p);
+          if (pageNumbers.length > 0) {
+            studentLastPages.set(work.student_id, pageNumbers[pageNumbers.length - 1]);
+          }
+        }
       }
     });
 
@@ -309,6 +344,9 @@ const StudentRecords = () => {
           studentUniquePages.set(rec.student_id, new Set());
         }
         studentUniquePages.get(rec.student_id)?.add(rec.page_number);
+        
+        // تتبع آخر صفحة للتمهيديين
+        studentLastPages.set(rec.student_id, `صفحة ${rec.page_number}`);
       }
     });
 
@@ -319,11 +357,46 @@ const StudentRecords = () => {
       }
     });
 
-    return Array.from(studentMap.values());
+    // معالجة الغيابات
+    attendanceData?.forEach(att => {
+      const summary = studentMap.get(att.student_id);
+      if (summary) {
+        summary.absenceCount++;
+      }
+    });
+
+    // معالجة الاختبارات
+    examData?.forEach(exam => {
+      const summary = studentMap.get(exam.student_id);
+      if (summary) {
+        summary.examsCount++;
+      }
+    });
+
+    // تحديث آخر صفحة
+    studentLastPages.forEach((page, studentId) => {
+      const summary = studentMap.get(studentId);
+      if (summary) {
+        summary.lastPage = page;
+      }
+    });
+
+    // حساب نقاط الترتيب (الصفحات + الاختبارات × 2)
+    const records = Array.from(studentMap.values());
+    records.forEach(record => {
+      record.rankingScore = record.totalPages + (record.examsCount * 2);
+    });
+
+    // ترتيب من الأعلى إلى الأدنى
+    records.sort((a, b) => b.rankingScore - a.rankingScore);
+
+    return records;
   };
 
   const fetchWeeklyRecords = async (teacherId: string, startDate: Date) => {
     const dateFilter = startDate.toISOString().split('T')[0];
+    const today = new Date();
+    const endDateStr = today.toISOString().split('T')[0];
 
     // جلب الحلقات الخاصة بالأستاذ
     const { data: circlesData, error: circlesError } = await supabase
@@ -360,23 +433,25 @@ const StudentRecords = () => {
     const activeStudents = allStudents?.filter(s => !discontinuedIds.has(s.id)) || [];
 
     // إنشاء Map لجميع الطلاب النشطين
-    const studentMap = new Map<string, any>();
+    const studentMap = new Map<string, StudentWeeklyRecord>();
     activeStudents.forEach(student => {
       studentMap.set(student.id, {
         student_id: student.id,
         studentName: student.name,
-        totalRecitationPages: 0,
-        totalReviewPages: 0,
-        totalHadithCount: 0,
-        totalExams: 0,
+        totalPages: 0,
+        absenceCount: 0,
+        lastPage: "لا يوجد",
+        examsCount: 0,
+        rankingScore: 0,
       });
     });
 
     // جلب بيانات الأعمال اليومية
     const { data: workData, error: workError } = await supabase
       .from('student_daily_work')
-      .select('student_id, new_recitation_pages, review_pages, hadith_count, new_recitation_grade')
+      .select('*')
       .gte('date', dateFilter)
+      .lte('date', endDateStr)
       .in('student_id', Array.from(studentMap.keys()));
 
     if (workError) throw workError;
@@ -384,31 +459,53 @@ const StudentRecords = () => {
     // جلب بيانات تسميعات التمهيديين
     const { data: beginnerData, error: beginnerError } = await supabase
       .from('student_beginner_recitations')
-      .select('student_id, page_number, grade')
+      .select('*')
       .gte('date', dateFilter)
+      .lte('date', endDateStr)
       .in('student_id', Array.from(studentMap.keys()));
 
     if (beginnerError) throw beginnerError;
 
+    // جلب الغيابات
+    const { data: attendanceData, error: attendanceError } = await supabase
+      .from('student_attendance')
+      .select('*')
+      .eq('status', 'غائب')
+      .gte('date', dateFilter)
+      .lte('date', endDateStr)
+      .in('student_id', Array.from(studentMap.keys()));
+
+    if (attendanceError) throw attendanceError;
+
     // جلب بيانات الاختبارات
     const { data: examData, error: examError } = await supabase
       .from('student_exams')
-      .select('student_id, id')
+      .select('*')
       .gte('exam_date', dateFilter)
+      .lte('exam_date', endDateStr)
       .in('student_id', Array.from(studentMap.keys()));
 
     if (examError) throw examError;
 
+    // معالجة البيانات
+    const studentLastPages = new Map<string, string>();
+    
     // إضافة بيانات الأعمال اليومية (استثناء الإعادات)
     workData?.forEach(work => {
       const summary = studentMap.get(work.student_id);
       if (summary) {
         // حساب الصفحات فقط إذا لم تكن إعادة
         if (work.new_recitation_grade !== 'إعادة') {
-          summary.totalRecitationPages += work.new_recitation_pages || 0;
+          summary.totalPages += work.new_recitation_pages || 0;
+          
+          // تتبع آخر صفحة
+          if (work.new_recitation_page_numbers) {
+            const pageNumbers = work.new_recitation_page_numbers.split(',').map((p: string) => p.trim()).filter((p: string) => p);
+            if (pageNumbers.length > 0) {
+              studentLastPages.set(work.student_id, pageNumbers[pageNumbers.length - 1]);
+            }
+          }
         }
-        summary.totalReviewPages += work.review_pages || 0;
-        summary.totalHadithCount += work.hadith_count || 0;
       }
     });
 
@@ -421,6 +518,9 @@ const StudentRecords = () => {
           studentUniquePages.set(rec.student_id, new Set());
         }
         studentUniquePages.get(rec.student_id)!.add(rec.page_number);
+        
+        // تتبع آخر صفحة للتمهيديين
+        studentLastPages.set(rec.student_id, `صفحة ${rec.page_number}`);
       }
     });
 
@@ -428,7 +528,15 @@ const StudentRecords = () => {
     studentUniquePages.forEach((pages, studentId) => {
       const summary = studentMap.get(studentId);
       if (summary) {
-        summary.totalRecitationPages += pages.size;
+        summary.totalPages += pages.size;
+      }
+    });
+
+    // معالجة الغيابات
+    attendanceData?.forEach(att => {
+      const summary = studentMap.get(att.student_id);
+      if (summary) {
+        summary.absenceCount++;
       }
     });
 
@@ -436,11 +544,28 @@ const StudentRecords = () => {
     examData?.forEach(exam => {
       const summary = studentMap.get(exam.student_id);
       if (summary) {
-        summary.totalExams += 1;
+        summary.examsCount += 1;
       }
     });
 
-    setRecords(Array.from(studentMap.values()));
+    // تحديث آخر صفحة
+    studentLastPages.forEach((page, studentId) => {
+      const summary = studentMap.get(studentId);
+      if (summary) {
+        summary.lastPage = page;
+      }
+    });
+
+    // حساب نقاط الترتيب (الصفحات + الاختبارات × 2)
+    const recordsArray = Array.from(studentMap.values());
+    recordsArray.forEach(record => {
+      record.rankingScore = record.totalPages + (record.examsCount * 2);
+    });
+
+    // ترتيب من الأعلى إلى الأدنى
+    recordsArray.sort((a, b) => b.rankingScore - a.rankingScore);
+
+    setRecords(recordsArray);
   };
 
   const fetchMonthlyRecords = async (teacherId: string, startDate: Date, endDate: Date) => {
@@ -760,8 +885,9 @@ const StudentRecords = () => {
                           <TableRow className="bg-primary/5">
                             <TableHead className="text-right font-bold">اسم الطالب</TableHead>
                             <TableHead className="text-center font-bold">الصفحات المسمعة</TableHead>
-                            <TableHead className="text-center font-bold">الغيابات</TableHead>
+                            <TableHead className="text-center font-bold">عدد الاختبارات</TableHead>
                             <TableHead className="text-center font-bold">آخر صفحة</TableHead>
+                            <TableHead className="text-center font-bold">الغيابات</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -775,18 +901,23 @@ const StudentRecords = () => {
                                   </span>
                                 </TableCell>
                                 <TableCell className="text-center">
+                                  <span className="inline-flex items-center justify-center px-3 py-1 rounded-full bg-secondary/10 text-secondary font-semibold">
+                                    {record.examsCount}
+                                  </span>
+                                </TableCell>
+                                <TableCell className="text-center text-sm text-muted-foreground">{record.lastPage}</TableCell>
+                                <TableCell className="text-center">
                                   <span className={`inline-flex items-center justify-center px-3 py-1 rounded-full font-semibold ${
                                     record.absenceCount > 3 ? 'bg-destructive/10 text-destructive' : 'bg-muted text-muted-foreground'
                                   }`}>
                                     {record.absenceCount}
                                   </span>
                                 </TableCell>
-                                <TableCell className="text-center text-sm text-muted-foreground">{record.lastPage}</TableCell>
                               </TableRow>
                             ))
                           ) : (
                             <TableRow>
-                              <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                              <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
                                 لا توجد بيانات لهذا الأسبوع
                               </TableCell>
                             </TableRow>
@@ -799,22 +930,36 @@ const StudentRecords = () => {
               ) : selectedView === 'weekly' ? (
                 <Table>
                   <TableHeader>
-                    <TableRow>
-                      <TableHead className="text-right">اسم الطالب</TableHead>
-                      <TableHead className="text-center">صفحات التسميع</TableHead>
-                      <TableHead className="text-center">صفحات المراجعة</TableHead>
-                      <TableHead className="text-center">الأحاديث</TableHead>
-                      <TableHead className="text-center">الاختبارات</TableHead>
+                    <TableRow className="bg-primary/5">
+                      <TableHead className="text-right font-bold">اسم الطالب</TableHead>
+                      <TableHead className="text-center font-bold">الصفحات المسمعة</TableHead>
+                      <TableHead className="text-center font-bold">عدد الاختبارات</TableHead>
+                      <TableHead className="text-center font-bold">آخر صفحة</TableHead>
+                      <TableHead className="text-center font-bold">الغيابات</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {records.map((record: any) => (
-                      <TableRow key={record.student_id}>
-                        <TableCell className="font-medium">{record.studentName}</TableCell>
-                        <TableCell className="text-center">{record.totalRecitationPages}</TableCell>
-                        <TableCell className="text-center">{record.totalReviewPages}</TableCell>
-                        <TableCell className="text-center">{record.totalHadithCount}</TableCell>
-                        <TableCell className="text-center">{record.totalExams}</TableCell>
+                    {(records as StudentWeeklyRecord[]).map((record) => (
+                      <TableRow key={record.student_id} className="hover:bg-muted/50 transition-colors">
+                        <TableCell className="font-semibold text-foreground">{record.studentName}</TableCell>
+                        <TableCell className="text-center">
+                          <span className="inline-flex items-center justify-center px-3 py-1 rounded-full bg-primary/10 text-primary font-semibold">
+                            {record.totalPages}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <span className="inline-flex items-center justify-center px-3 py-1 rounded-full bg-secondary/10 text-secondary font-semibold">
+                            {record.examsCount}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-center text-sm text-muted-foreground">{record.lastPage}</TableCell>
+                        <TableCell className="text-center">
+                          <span className={`inline-flex items-center justify-center px-3 py-1 rounded-full font-semibold ${
+                            record.absenceCount > 3 ? 'bg-destructive/10 text-destructive' : 'bg-muted text-muted-foreground'
+                          }`}>
+                            {record.absenceCount}
+                          </span>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

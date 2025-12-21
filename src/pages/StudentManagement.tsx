@@ -553,26 +553,27 @@ const StudentManagement = () => {
           <CardContent>
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead className="text-right">الإجراءات</TableHead>
-                  <TableHead className="text-right">ملاحظات</TableHead>
-                  <TableHead className="text-right">المستوى</TableHead>
-                  <TableHead className="text-right">الحلقة</TableHead>
-                  <TableHead className="text-right">العمر</TableHead>
-                  <TableHead className="text-right">الاسم</TableHead>
-                  <TableHead className="text-right">الصورة</TableHead>
+                <TableRow className="bg-primary/5">
+                  <TableHead className="text-right font-bold">الإجراءات</TableHead>
+                  <TableHead className="text-right font-bold">ملاحظات</TableHead>
+                  <TableHead className="text-right font-bold">المستوى</TableHead>
+                  <TableHead className="text-right font-bold">الحلقة</TableHead>
+                  <TableHead className="text-right font-bold">العمر</TableHead>
+                  <TableHead className="text-right font-bold">الاسم</TableHead>
+                  <TableHead className="text-center font-bold">الرقم التسلسلي</TableHead>
+                  <TableHead className="text-right font-bold">الصورة</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                       جاري تحميل الطلاب...
                     </TableCell>
                   </TableRow>
                 ) : students.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                       لا يوجد طلاب مسجلين
                     </TableCell>
                   </TableRow>
@@ -629,9 +630,26 @@ const StudentManagement = () => {
                           {student.name}
                         </a>
                       </TableCell>
+                      <TableCell className="text-center">
+                        <span className="inline-flex items-center justify-center px-3 py-1 rounded-full bg-primary/10 text-primary font-bold">
+                          {student.student_number || '-'}
+                        </span>
+                      </TableCell>
                       <TableCell>
-                        <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center">
-                          <User className="w-6 h-6 text-gray-500" />
+                        {student.photo_url ? (
+                          <img 
+                            src={student.photo_url} 
+                            alt={student.name}
+                            className="w-12 h-12 rounded-full object-cover border-2 border-primary/20"
+                            onError={(e) => {
+                              // في حالة فشل تحميل الصورة، نعرض الأيقونة الافتراضية
+                              e.currentTarget.style.display = 'none';
+                              e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                            }}
+                          />
+                        ) : null}
+                        <div className={`w-12 h-12 bg-gradient-to-br from-primary/20 to-primary/10 rounded-full flex items-center justify-center ${student.photo_url ? 'hidden' : ''}`}>
+                          <User className="w-6 h-6 text-primary" />
                         </div>
                       </TableCell>
                     </TableRow>

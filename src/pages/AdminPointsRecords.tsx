@@ -11,14 +11,11 @@ import { exportToExcel } from "@/lib/exportToExcel";
 
 interface PointRecord {
   id: string;
-  student_id: string;
   student_name: string;
+  student_number: number;
   circle_name: string;
   circle_id?: string;
-  point_type: string;
-  points: number;
-  reason: string | null;
-  date: string;
+  enthusiasm_points: number;
 }
 
 interface Circle {
@@ -55,30 +52,64 @@ const AdminPointsRecords = () => {
   const fetchPointRecords = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('student_points')
+      
+      // جلب جميع الطلاب النشطين
+      const { data: studentsData, error: studentsError } = await supabase
+        .from('students')
         .select(`
-          *,
-          students (
-            name,
-            circle_id,
-            circles (
-              name
-            )
+          id,
+          name,
+          student_number,
+          circle_id,
+          circles (
+            name
           )
-        `)
-        .order('date', { ascending: false });
+        `);
 
-      if (error) throw error;
+      if (studentsError) throw studentsError;
 
-      const recordsWithDetails = data?.map(record => ({
-        ...record,
-        student_name: record.students?.name || "غير محدد",
-        circle_name: record.students?.circles?.name || "غير محدد",
-        circle_id: record.students?.circle_id
-      })) || [];
+      // استثناء المنقطعين
+      const { data: discontinuedStudents } = await supabase
+        .from('discontinued_students')
+        .select('id');
+      
+      const discontinuedIds = new Set(discontinuedStudents?.map(s => s.id) || []);
+      const activeStudents = studentsData?.filter(s => !discontinuedIds.has(s.id)) || [];
 
-      setPointRecords(recordsWithDetails);
+      // جلب نقاط الحماسة لكل طالب
+      const { data: pointsData, error: pointsError } = await supabase
+        .from('student_points')
+        .select('*')
+        .eq('point_type', 'enthusiasm')
+        .in('student_id', activeStudents.map(s => s.id));
+
+      if (pointsError) throw pointsError;
+
+      // حساب إجمالي نقاط الحماسة لكل طالب
+      const studentPointsMap = new Map();
+      activeStudents.forEach(student => {
+        studentPointsMap.set(student.id, {
+          id: student.id,
+          student_name: student.name,
+          student_number: student.student_number,
+          circle_name: student.circles?.name || "غير محدد",
+          circle_id: student.circle_id,
+          enthusiasm_points: 0
+        });
+      });
+
+      pointsData?.forEach(point => {
+        const student = studentPointsMap.get(point.student_id);
+        if (student) {
+          student.enthusiasm_points += point.points;
+        }
+      });
+
+      // تحويل إلى مصفوفة وترتيب من الأعلى إلى الأدنى
+      const sortedRecords = Array.from(studentPointsMap.values())
+        .sort((a, b) => b.enthusiasm_points - a.enthusiasm_points);
+
+      setPointRecords(sortedRecords);
     } catch (error) {
       console.error('Error fetching point records:', error);
       toast({
@@ -103,38 +134,26 @@ const AdminPointsRecords = () => {
 
   const filteredRecords = pointRecords.filter(record => {
     const circleMatch = selectedCircle === "all" || record.circle_id === selectedCircle;
-    const typeMatch = selectedPointType === "all" || record.point_type === selectedPointType;
-    return circleMatch && typeMatch;
+    return circleMatch;
   });
 
   const handleExportPoints = () => {
     const exportData = filteredRecords.map((record, index) => ({
-      'الرقم': index + 1,
-      'التاريخ': new Date(record.date).toLocaleDateString('ar-EG'),
+      'الترتيب': index + 1,
+      'الرقم التسلسلي': record.student_number,
       'اسم الطالب': record.student_name,
       'الحلقة': record.circle_name,
-      'نوع النقاط': getPointTypeLabel(record.point_type),
-      'عدد النقاط': record.points,
-      'السبب': record.reason || '-',
+      'نقاط الحماسة': record.enthusiasm_points,
     }));
 
     const circleName = selectedCircle === "all" ? 'جميع_الحلقات' : circles.find(c => c.id === selectedCircle)?.name || 'حلقة';
-    const pointType = selectedPointType === "all" ? 'جميع_الأنواع' : getPointTypeLabel(selectedPointType);
-    exportToExcel(exportData, `سجلات_النقاط_${circleName}_${pointType}_${new Date().toLocaleDateString('ar-SA')}`, 'النقاط');
+    exportToExcel(exportData, `نقاط_الحماسة_${circleName}_${new Date().toLocaleDateString('ar-SA')}`, 'نقاط_الحماسة');
     
     toast({
       title: "تم التصدير بنجاح",
-      description: "تم تصدير سجلات النقاط إلى ملف Excel",
+      description: "تم تصدير نقاط الحماسة إلى ملف Excel",
     });
   };
-
-  const pointTypes = [
-    { value: "all", label: "جميع الأنواع" },
-    { value: "enthusiasm", label: "نقاط الحماسة" },
-    { value: "general", label: "نقاط عامة" },
-    { value: "bonus", label: "نقاط إضافية" },
-    { value: "penalty", label: "خصم نقاط" },
-  ];
 
   return (
     <div dir="rtl" className="min-h-screen bg-gray-50">
@@ -150,7 +169,7 @@ const AdminPointsRecords = () => {
             <div className="flex justify-between items-center flex-wrap gap-4">
               <CardTitle className="text-right flex items-center gap-3">
                 <Award className="w-6 h-6 text-yellow-600" />
-                جميع سجلات النقاط
+                نقاط الحماسة - الترتيب العام
               </CardTitle>
               <div className="flex gap-4 items-center flex-wrap">
                 {!loading && filteredRecords.length > 0 && (
@@ -159,18 +178,6 @@ const AdminPointsRecords = () => {
                     تصدير إلى Excel
                   </Button>
                 )}
-                <Select value={selectedPointType} onValueChange={setSelectedPointType}>
-                  <SelectTrigger className="w-48 text-right bg-background">
-                    <SelectValue placeholder="نوع النقاط" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-background z-50">
-                    {pointTypes.map((type) => (
-                      <SelectItem key={type.value} value={type.value}>
-                        {type.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
                 <Select value={selectedCircle} onValueChange={setSelectedCircle}>
                   <SelectTrigger className="w-48 text-right bg-background">
                     <SelectValue placeholder="فلترة حسب الحلقة" />
@@ -191,55 +198,53 @@ const AdminPointsRecords = () => {
             <div className="overflow-x-auto" dir="rtl">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead className="text-right">التاريخ</TableHead>
-                    <TableHead className="text-center">الطالب</TableHead>
-                    <TableHead className="text-right">الحلقة</TableHead>
-                    <TableHead className="text-right">نوع النقاط</TableHead>
-                    <TableHead className="text-right">النقاط</TableHead>
-                    <TableHead className="text-right">السبب</TableHead>
+                  <TableRow className="bg-primary/5">
+                    <TableHead className="text-center font-bold">الترتيب</TableHead>
+                    <TableHead className="text-center font-bold">الرقم التسلسلي</TableHead>
+                    <TableHead className="text-right font-bold">اسم الطالب</TableHead>
+                    <TableHead className="text-right font-bold">الحلقة</TableHead>
+                    <TableHead className="text-center font-bold">نقاط الحماسة</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {loading ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                         جاري تحميل السجلات...
                       </TableCell>
                     </TableRow>
                   ) : filteredRecords.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                         لا توجد سجلات نقاط
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredRecords.map((record) => (
-                      <TableRow key={record.id}>
-                        <TableCell className="text-right">
-                          {new Date(record.date).toLocaleDateString('ar-EG')}
+                    filteredRecords.map((record, index) => (
+                      <TableRow key={record.id} className="hover:bg-muted/50 transition-colors">
+                        <TableCell className="text-center">
+                          <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full font-bold ${
+                            index === 0 ? 'bg-yellow-500 text-white' :
+                            index === 1 ? 'bg-gray-400 text-white' :
+                            index === 2 ? 'bg-orange-600 text-white' :
+                            'bg-muted text-foreground'
+                          }`}>
+                            {index + 1}
+                          </span>
                         </TableCell>
-                        <TableCell className="text-center font-medium">
+                        <TableCell className="text-center font-medium text-muted-foreground">
+                          {record.student_number}
+                        </TableCell>
+                        <TableCell className="text-right font-semibold">
                           {record.student_name}
                         </TableCell>
-                        <TableCell className="text-right">{record.circle_name}</TableCell>
-                        <TableCell className="text-right">
-                          <span className={`px-2 py-1 rounded text-xs font-medium ${
-                            record.point_type === 'enthusiasm' ? 'bg-purple-100 text-purple-800' :
-                            record.point_type === 'general' ? 'bg-blue-100 text-blue-800' :
-                            record.point_type === 'bonus' ? 'bg-green-100 text-green-800' :
-                            'bg-red-100 text-red-800'
-                          }`}>
-                            {getPointTypeLabel(record.point_type)}
-                          </span>
+                        <TableCell className="text-right text-muted-foreground">
+                          {record.circle_name}
                         </TableCell>
-                        <TableCell className="text-right">
-                          <span className={`font-bold ${record.points > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                            {record.points > 0 ? '+' : ''}{record.points}
+                        <TableCell className="text-center">
+                          <span className="inline-flex items-center justify-center px-4 py-2 rounded-full bg-primary/10 text-primary font-bold text-lg">
+                            {record.enthusiasm_points}
                           </span>
-                        </TableCell>
-                        <TableCell className="text-right max-w-xs truncate">
-                          {record.reason || '-'}
                         </TableCell>
                       </TableRow>
                     ))

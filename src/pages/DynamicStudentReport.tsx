@@ -31,7 +31,27 @@ const DynamicStudentReport = () => {
   const [records, setRecords] = useState<any[]>([]);
   const [loadingRecords, setLoadingRecords] = useState(false);
   const [currentStudentId, setCurrentStudentId] = useState<string | null>(null);
-  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  
+  // دالة لتحديد التاريخ الافتراضي بناءً على الوقت الحالي (بتوقيت مكة المكرمة UTC+3)
+  const getInitialDate = () => {
+    // الحصول على الوقت بتوقيت مكة المكرمة (UTC+3)
+    const now = new Date();
+    const meccaTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Riyadh' }));
+    const hours = meccaTime.getHours();
+    const minutes = meccaTime.getMinutes();
+    
+    // إذا كان الوقت قبل الساعة 5:30 مساءً (17:30), نعرض بيانات الأمس
+    if (hours < 17 || (hours === 17 && minutes < 30)) {
+      const yesterday = new Date(meccaTime);
+      yesterday.setDate(yesterday.getDate() - 1);
+      return yesterday.toISOString().split('T')[0];
+    }
+    
+    // بعد الساعة 5:30 مساءً (17:30), نعرض بيانات اليوم
+    return meccaTime.toISOString().split('T')[0];
+  };
+  
+  const [selectedDate, setSelectedDate] = useState<string>(getInitialDate());
   const [effectiveDisplayDate, setEffectiveDisplayDate] = useState<string | null>(null);
   const [availableDates, setAvailableDates] = useState<{value: string, label: string, dayName: string, isToday?: boolean}[]>([]);
   const [dateChanging, setDateChanging] = useState(false);
@@ -1001,19 +1021,17 @@ const DynamicStudentReport = () => {
             </Sheet>
             </div>
 
-            <div className="relative z-10 text-primary-foreground font-bold text-lg flex items-center gap-2 bg-primary-foreground/10 px-4 py-2 rounded-full backdrop-blur-sm border border-primary-foreground/20 hover:bg-primary-foreground/20 transition-all duration-300">
-              <span className="text-sm hidden sm:inline">النقاط العامة:</span>
-              <span className="text-xl sm:text-2xl animate-pulse">{totalPoints}</span>
-            </div>
-            <div className="relative z-10 text-primary-foreground font-bold text-lg sm:text-2xl flex items-center gap-3 bg-primary-foreground/10 px-6 py-2 rounded-full backdrop-blur-sm border border-primary-foreground/20">
+            <div className="relative z-10 text-primary-foreground font-bold flex items-center gap-2 sm:gap-3 bg-primary-foreground/10 px-3 sm:px-6 py-2 rounded-full backdrop-blur-sm border border-primary-foreground/20">
               {studentData.photoUrl && (
                 <img 
                   src={studentData.photoUrl} 
                   alt={studentData.name}
-                  className="w-10 h-10 rounded-full border-2 border-primary-foreground object-cover"
+                  className="w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 border-primary-foreground object-cover flex-shrink-0"
                 />
               )}
-              {studentData.name}
+              <span className="text-sm sm:text-lg md:text-xl truncate max-w-[120px] sm:max-w-none">
+                {studentData.name}
+              </span>
             </div>
           </div>
         </div>
@@ -1238,14 +1256,14 @@ const DynamicStudentReport = () => {
           
           {/* الكاردات الثابتة (تظهر دائماً) */}
           
-          {/* 5. النقاط */}
+          {/* 5. السلوك */}
+          <BehaviorSection behavior={studentData.behavior} />
+          
+          {/* 6. النقاط */}
           <PointsSection 
             enthusiasmPoints={studentData.enthusiasmPoints}
-            generalPoints={studentData.generalPoints}
+            generalPoints={0}
           />
-          
-          {/* 6. السلوك */}
-          <BehaviorSection behavior={studentData.behavior} />
         </div>
         
         <footer className="mt-12 text-center text-muted-foreground">

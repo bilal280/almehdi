@@ -326,6 +326,7 @@ const ExamManagement = () => {
                           <SelectValue placeholder="اختر المرحلة" />
                         </SelectTrigger>
                         <SelectContent className="bg-background z-50">
+                          {/* المراحل الأساسية */}
                           <SelectItem value="مرحلة الحروف">مرحلة الحروف</SelectItem>
                           <SelectItem value="مرحلة الحركات">مرحلة الحركات</SelectItem>
                           <SelectItem value="مرحلة السكون">مرحلة السكون</SelectItem>
@@ -334,6 +335,19 @@ const ExamManagement = () => {
                           <SelectItem value="مرحلة المدود">مرحلة المدود</SelectItem>
                           <SelectItem value="مرحلة همزة الوصل">مرحلة همزة الوصل</SelectItem>
                           <SelectItem value="مرحلة كامل">مرحلة كامل</SelectItem>
+                          {/* المراحل كل 5 صفحات */}
+                          <SelectItem value="المرحلة الأولى (1-5)">المرحلة الأولى (1-5)</SelectItem>
+                          <SelectItem value="المرحلة الثانية (6-10)">المرحلة الثانية (6-10)</SelectItem>
+                          <SelectItem value="المرحلة الثالثة (11-15)">المرحلة الثالثة (11-15)</SelectItem>
+                          <SelectItem value="المرحلة الرابعة (16-20)">المرحلة الرابعة (16-20)</SelectItem>
+                          <SelectItem value="المرحلة الخامسة (21-25)">المرحلة الخامسة (21-25)</SelectItem>
+                          <SelectItem value="المرحلة السادسة (26-30)">المرحلة السادسة (26-30)</SelectItem>
+                          <SelectItem value="المرحلة السابعة (31-35)">المرحلة السابعة (31-35)</SelectItem>
+                          <SelectItem value="المرحلة الثامنة (36-40)">المرحلة الثامنة (36-40)</SelectItem>
+                          <SelectItem value="المرحلة التاسعة (41-45)">المرحلة التاسعة (41-45)</SelectItem>
+                          <SelectItem value="المرحلة العاشرة (46-50)">المرحلة العاشرة (46-50)</SelectItem>
+                          <SelectItem value="المرحلة الحادية عشر (51-55)">المرحلة الحادية عشر (51-55)</SelectItem>
+                          <SelectItem value="المرحلة الثانية عشر (56-60)">المرحلة الثانية عشر (56-60)</SelectItem>
                           <SelectItem value="أخرى">أخرى</SelectItem>
                         </SelectContent>
                       </Select>
@@ -355,10 +369,13 @@ const ExamManagement = () => {
                               الجزء {num}
                             </SelectItem>
                           ))}
-                          {/* المراحل */}
-                          <SelectItem value="مرحلة العشرة">مرحلة العشرة</SelectItem>
-                          <SelectItem value="مرحلة العشرين">مرحلة العشرين</SelectItem>
-                          <SelectItem value="مرحلة الكامل">مرحلة الكامل</SelectItem>
+                          {/* المراحل كل 5 أجزاء */}
+                          <SelectItem value="المرحلة الأولى (1-5)">المرحلة الأولى (1-5)</SelectItem>
+                          <SelectItem value="المرحلة الثانية (6-10)">المرحلة الثانية (6-10)</SelectItem>
+                          <SelectItem value="المرحلة الثالثة (11-15)">المرحلة الثالثة (11-15)</SelectItem>
+                          <SelectItem value="المرحلة الرابعة (16-20)">المرحلة الرابعة (16-20)</SelectItem>
+                          <SelectItem value="المرحلة الخامسة (21-25)">المرحلة الخامسة (21-25)</SelectItem>
+                          <SelectItem value="المرحلة السادسة (26-30)">المرحلة السادسة (26-30)</SelectItem>
                           {/* الأحزاب الأخيرة */}
                           <SelectItem value="الحزب 57">الحزب 57</SelectItem>
                           <SelectItem value="الحزب 58">الحزب 58</SelectItem>
@@ -366,6 +383,8 @@ const ExamManagement = () => {
                           <SelectItem value="الحزب 60">الحزب 60</SelectItem>
                           {/* السور */}
                           <SelectItem value="عم وتبارك">عم وتبارك</SelectItem>
+                          {/* أخرى */}
+                          <SelectItem value="أخرى">أخرى</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -387,14 +406,16 @@ const ExamManagement = () => {
                             </SelectItem>
                           ))}
                           {/* المراحل كل 5 أجزاء */}
-                          <SelectItem value="مرحلة الخمسة">مرحلة الخمسة</SelectItem>
-                          <SelectItem value="مرحلة العشرة">مرحلة العشرة</SelectItem>
-                          <SelectItem value="مرحلة الخمسة عشر">مرحلة الخمسة عشر</SelectItem>
-                          <SelectItem value="مرحلة العشرين">مرحلة العشرين</SelectItem>
-                          <SelectItem value="مرحلة الخمسة والعشرين">مرحلة الخمسة والعشرين</SelectItem>
-                          <SelectItem value="مرحلة الكامل">مرحلة الكامل</SelectItem>
+                          <SelectItem value="المرحلة الأولى (1-5)">المرحلة الأولى (1-5)</SelectItem>
+                          <SelectItem value="المرحلة الثانية (6-10)">المرحلة الثانية (6-10)</SelectItem>
+                          <SelectItem value="المرحلة الثالثة (11-15)">المرحلة الثالثة (11-15)</SelectItem>
+                          <SelectItem value="المرحلة الرابعة (16-20)">المرحلة الرابعة (16-20)</SelectItem>
+                          <SelectItem value="المرحلة الخامسة (21-25)">المرحلة الخامسة (21-25)</SelectItem>
+                          <SelectItem value="المرحلة السادسة (26-30)">المرحلة السادسة (26-30)</SelectItem>
                           {/* السور */}
                           <SelectItem value="عم وتبارك">عم وتبارك</SelectItem>
+                          {/* أخرى */}
+                          <SelectItem value="أخرى">أخرى</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -424,6 +445,10 @@ const ExamManagement = () => {
                         <SelectItem value="2">المحاولة الثانية</SelectItem>
                         <SelectItem value="3">المحاولة الثالثة</SelectItem>
                         <SelectItem value="4">المحاولة الرابعة</SelectItem>
+                        <SelectItem value="100">المرحلة</SelectItem>
+                        {selectedStudentLevel === 'حافظ' && (
+                          <SelectItem value="200">التثبيت</SelectItem>
+                        )}
                       </SelectContent>
                     </Select>
                   </div>

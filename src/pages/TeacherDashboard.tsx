@@ -151,23 +151,18 @@ const TeacherDashboard = () => {
             ))}
           </div>
 
-          {/* Quick Stats */}
+          {/* Footer with Hijri Date */}
           <div className="mt-16 text-center fade-in-up">
             <div className="islamic-card p-6">
-              <div className="flex items-center justify-center gap-2 mb-4">
-                <Calendar className="w-5 h-5 text-primary" />
-                <span className="text-lg font-semibold text-primary">
-                  {new Date().toLocaleDateString('ar-SA', {
-                    weekday: 'long',
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric'
-                  })}
-                </span>
-              </div>
-              <p className="text-muted-foreground">
+              <p className="text-muted-foreground mb-4">
                 نسأل الله أن يبارك في جهودكم ويجعل عملكم في ميزان حسناتكم
               </p>
+              <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                <Calendar className="w-4 h-4" />
+                <span>
+                  التقويم الهجري: {new Date().getFullYear() - 622} هـ
+                </span>
+              </div>
             </div>
           </div>
         </main>

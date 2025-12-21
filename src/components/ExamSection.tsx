@@ -30,6 +30,9 @@ const ExamSection = ({ exams }: ExamSectionProps) => {
       case 1: return "المحاولة الأولى";
       case 2: return "المحاولة الثانية";
       case 3: return "المحاولة الثالثة";
+      case 4: return "المحاولة الرابعة";
+      case 100: return "المرحلة";
+      case 200: return "التثبيت";
       default: return `المحاولة ${attemptNumber}`;
     }
   };

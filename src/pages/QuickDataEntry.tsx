@@ -564,7 +564,9 @@ const QuickDataEntry = () => {
             rec => rec.pageNumber && rec.grade && !isNaN(parseInt(rec.pageNumber))
           );
           
-          if (validRecitations.length > 0 || data.behaviorGrade || data.notes) {
+          const hasAnyData = validRecitations.length > 0 || data.behaviorGrade || data.notes;
+          
+          if (hasAnyData) {
             console.log(`[حفظ تمهيدي] الطالب: ${student.name}, عدد التسميعات: ${validRecitations.length}`);
             
             // حفظ كل صفحة
@@ -663,7 +665,8 @@ const QuickDataEntry = () => {
             }
 
             // تسجيل الحضور تلقائياً للطالب التمهيدي
-            if (data.attendance !== 'absent' && validRecitations.length > 0) {
+            // إذا لم يكن غائباً (سواء كان حاضراً أو لم يتم تحديد حالته)
+            if (data.attendance !== 'absent') {
               const { error: attendanceError } = await supabase
                 .from('student_attendance')
                 .upsert({
@@ -708,8 +711,54 @@ const QuickDataEntry = () => {
 
             console.log(`[✓ نجح الحفظ] الطالب التمهيدي: ${student.name}`);
             savedCount++;
-          } else {
-            console.log(`[تخطي] الطالب التمهيدي: ${student.name} - لا توجد بيانات للحفظ`);
+          }
+          
+          // تسجيل الحضور تلقائياً للطالب التمهيدي (حتى لو لم تكن هناك بيانات)
+          // إذا لم يكن غائباً (سواء كان حاضراً أو لم يتم تحديد حالته)
+          if (data.attendance !== 'absent') {
+            const { error: attendanceError } = await supabase
+              .from('student_attendance')
+              .upsert({
+                student_id: student.id,
+                status: 'present',
+                teacher_id: teacher.id,
+                date: today,
+              });
+
+            if (attendanceError) {
+              console.error('Error upserting attendance:', attendanceError);
+            }
+
+            // إضافة نقطة حماسة إذا لم تكن موجودة
+            const { data: existingPoints, error: pointsSelectError } = await supabase
+              .from('student_points')
+              .select('*')
+              .eq('student_id', student.id)
+              .eq('date', today)
+              .eq('point_type', 'enthusiasm')
+              .maybeSingle();
+
+            if (pointsSelectError) {
+              console.error('Error selecting points:', pointsSelectError);
+            } else if (!existingPoints) {
+              const { error: pointsInsertError } = await supabase
+                .from('student_points')
+                .insert({
+                  student_id: student.id,
+                  date: today,
+                  point_type: 'enthusiasm',
+                  points: 1,
+                  reason: 'حضور'
+                });
+
+              if (pointsInsertError) {
+                console.error('Error inserting points:', pointsInsertError);
+              }
+            }
+          }
+          
+          if (!hasAnyData) {
+            console.log(`[تخطي البيانات] الطالب التمهيدي: ${student.name} - لا توجد بيانات للحفظ، لكن تم تسجيل الحضور`);
           }
         } else {
           // معالجة الطلاب العاديين - دعم صفحات متعددة
@@ -718,15 +767,15 @@ const QuickDataEntry = () => {
           ) || [];
           
           const hasOtherData = (student.level === 'حافظ' && data.reviewPages ? data.reviewPages.trim() : false) || data.reviewGrade || data.behaviorGrade || data.notes;
+          const hasAnyData = validRecitations.length > 0 || hasOtherData;
 
-          if (validRecitations.length === 0 && !hasOtherData) continue;
-
-          const { data: existingWork } = await supabase
-            .from('student_daily_work')
-            .select('*')
-            .eq('student_id', student.id)
-            .eq('date', today)
-            .maybeSingle();
+          if (hasAnyData) {
+            const { data: existingWork } = await supabase
+              .from('student_daily_work')
+              .select('*')
+              .eq('student_id', student.id)
+              .eq('date', today)
+              .maybeSingle();
 
           // حساب عدد الصفحات من أرقام الصفحات
           let totalPages = 0;
@@ -821,7 +870,11 @@ const QuickDataEntry = () => {
             }
           }
 
-          // تسجيل الحضور تلقائياً للطالب العادي
+          savedCount++;
+          }
+          
+          // تسجيل الحضور تلقائياً للطالب العادي (حتى لو لم تكن هناك بيانات)
+          // إذا لم يكن غائباً (سواء كان حاضراً أو لم يتم تحديد حالته)
           if (data.attendance !== 'absent') {
             await supabase
               .from('student_attendance')
@@ -853,8 +906,10 @@ const QuickDataEntry = () => {
                 });
             }
           }
-
-          savedCount++;
+          
+          if (!hasAnyData) {
+            console.log(`[تخطي البيانات] الطالب العادي: ${student.name} - لا توجد بيانات للحفظ، لكن تم تسجيل الحضور`);
+          }
         }
         } catch (studentError: any) {
           console.error(`Error saving data for student ${student.name}:`, studentError);

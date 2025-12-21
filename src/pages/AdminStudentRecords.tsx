@@ -20,6 +20,17 @@ interface StudentSummary {
   totalExams: number;
 }
 
+interface StudentWeeklySummary {
+  student_id: string;
+  studentName: string;
+  circleName: string;
+  totalPages: number;
+  examsCount: number;
+  lastPage: string;
+  absenceCount: number;
+  rankingScore: number;
+}
+
 interface StudentMonthlyRecord {
   student_id: string;
   studentName: string;
@@ -42,7 +53,7 @@ interface Circle {
 const AdminStudentRecords = () => {
   const [selectedView, setSelectedView] = useState<'weekly' | 'monthly'>('weekly');
   const [selectedCircle, setSelectedCircle] = useState<string>('all');
-  const [records, setRecords] = useState<StudentSummary[]>([]);
+  const [records, setRecords] = useState<StudentSummary[] | StudentWeeklySummary[]>([]);
   const [circles, setCircles] = useState<Circle[]>([]);
   const [loading, setLoading] = useState(true);
   
@@ -147,6 +158,7 @@ const AdminStudentRecords = () => {
       }
 
       const dateFilter = startDate.toISOString().split('T')[0];
+      const endDateStr = today.toISOString().split('T')[0];
 
       // جلب جميع الطلاب أولاً (استثناء المنقطعين)
       let studentsQuery = supabase
@@ -178,90 +190,228 @@ const AdminStudentRecords = () => {
       // تصفية الطلاب لاستثناء المنقطعين
       const activeStudents = allStudents?.filter(s => !discontinuedIds.has(s.id)) || [];
 
-      // إنشاء Map لجميع الطلاب النشطين
-      const studentMap = new Map<string, StudentSummary>();
-      activeStudents.forEach(student => {
-        studentMap.set(student.id, {
-          student_id: student.id,
-          studentName: student.name,
-          circleName: student.circles?.name || 'غير محدد',
-          totalRecitationPages: 0,
-          totalReviewPages: 0,
-          totalHadithCount: 0,
-          totalExams: 0,
+      if (selectedView === 'weekly') {
+        // إنشاء Map للسجلات الأسبوعية
+        const studentMap = new Map<string, StudentWeeklySummary>();
+        activeStudents.forEach(student => {
+          studentMap.set(student.id, {
+            student_id: student.id,
+            studentName: student.name,
+            circleName: student.circles?.name || 'غير محدد',
+            totalPages: 0,
+            examsCount: 0,
+            lastPage: 'لا يوجد',
+            absenceCount: 0,
+            rankingScore: 0,
+          });
         });
-      });
 
-      // جلب بيانات الأعمال اليومية
-      const { data: workData, error: workError } = await supabase
-        .from('student_daily_work')
-        .select('student_id, new_recitation_pages, review_pages, hadith_count, new_recitation_grade')
-        .gte('date', dateFilter)
-        .in('student_id', Array.from(studentMap.keys()));
+        // جلب بيانات الأعمال اليومية
+        const { data: workData, error: workError } = await supabase
+          .from('student_daily_work')
+          .select('*')
+          .gte('date', dateFilter)
+          .lte('date', endDateStr)
+          .in('student_id', Array.from(studentMap.keys()));
 
-      if (workError) throw workError;
+        if (workError) throw workError;
 
-      // جلب بيانات تسميعات التمهيديين
-      const { data: beginnerData, error: beginnerError } = await supabase
-        .from('student_beginner_recitations')
-        .select('student_id, page_number, grade')
-        .gte('date', dateFilter)
-        .in('student_id', Array.from(studentMap.keys()));
+        // جلب بيانات تسميعات التمهيديين
+        const { data: beginnerData, error: beginnerError } = await supabase
+          .from('student_beginner_recitations')
+          .select('*')
+          .gte('date', dateFilter)
+          .lte('date', endDateStr)
+          .in('student_id', Array.from(studentMap.keys()));
 
-      if (beginnerError) throw beginnerError;
+        if (beginnerError) throw beginnerError;
 
-      // جلب بيانات الاختبارات
-      const { data: examData, error: examError } = await supabase
-        .from('student_exams')
-        .select('student_id, id')
-        .gte('exam_date', dateFilter)
-        .in('student_id', Array.from(studentMap.keys()));
+        // جلب الغيابات
+        const { data: attendanceData, error: attendanceError } = await supabase
+          .from('student_attendance')
+          .select('*')
+          .eq('status', 'غائب')
+          .gte('date', dateFilter)
+          .lte('date', endDateStr)
+          .in('student_id', Array.from(studentMap.keys()));
 
-      if (examError) throw examError;
+        if (attendanceError) throw attendanceError;
 
-      // إضافة بيانات الأعمال اليومية (استثناء الإعادات)
-      workData?.forEach(work => {
-        const summary = studentMap.get(work.student_id);
-        if (summary) {
-          // حساب الصفحات فقط إذا لم تكن إعادة
-          if (work.new_recitation_grade !== 'إعادة') {
-            summary.totalRecitationPages += work.new_recitation_pages || 0;
+        // جلب بيانات الاختبارات
+        const { data: examData, error: examError } = await supabase
+          .from('student_exams')
+          .select('*')
+          .gte('exam_date', dateFilter)
+          .lte('exam_date', endDateStr)
+          .in('student_id', Array.from(studentMap.keys()));
+
+        if (examError) throw examError;
+
+        // معالجة البيانات
+        const studentLastPages = new Map<string, string>();
+        
+        // إضافة بيانات الأعمال اليومية (استثناء الإعادات)
+        workData?.forEach(work => {
+          const summary = studentMap.get(work.student_id);
+          if (summary) {
+            // حساب الصفحات فقط إذا لم تكن إعادة
+            if (work.new_recitation_grade !== 'إعادة') {
+              summary.totalPages += work.new_recitation_pages || 0;
+              
+              // تتبع آخر صفحة
+              if (work.new_recitation_page_numbers) {
+                const pageNumbers = work.new_recitation_page_numbers.split(',').map((p: string) => p.trim()).filter((p: string) => p);
+                if (pageNumbers.length > 0) {
+                  studentLastPages.set(work.student_id, pageNumbers[pageNumbers.length - 1]);
+                }
+              }
+            }
           }
-          summary.totalReviewPages += work.review_pages || 0;
-          summary.totalHadithCount += work.hadith_count || 0;
-        }
-      });
+        });
 
-      // إضافة بيانات التمهيديين (حساب الصفحات الفريدة، استثناء الإعادات)
-      const studentUniquePages = new Map<string, Set<number>>();
-      beginnerData?.forEach(rec => {
-        const summary = studentMap.get(rec.student_id);
-        if (summary && rec.grade !== 'إعادة') {
-          if (!studentUniquePages.has(rec.student_id)) {
-            studentUniquePages.set(rec.student_id, new Set());
+        // إضافة بيانات التمهيديين (حساب الصفحات الفريدة، استثناء الإعادات)
+        const studentUniquePages = new Map<string, Set<number>>();
+        beginnerData?.forEach(rec => {
+          const summary = studentMap.get(rec.student_id);
+          if (summary && rec.grade !== 'إعادة') {
+            if (!studentUniquePages.has(rec.student_id)) {
+              studentUniquePages.set(rec.student_id, new Set());
+            }
+            studentUniquePages.get(rec.student_id)!.add(rec.page_number);
+            
+            // تتبع آخر صفحة للتمهيديين
+            studentLastPages.set(rec.student_id, `صفحة ${rec.page_number}`);
           }
-          studentUniquePages.get(rec.student_id)!.add(rec.page_number);
-        }
-      });
+        });
 
-      // إضافة عدد الصفحات الفريدة للتمهيديين
-      studentUniquePages.forEach((pages, studentId) => {
-        const summary = studentMap.get(studentId);
-        if (summary) {
-          summary.totalRecitationPages += pages.size;
-        }
-      });
+        // إضافة عدد الصفحات الفريدة للتمهيديين
+        studentUniquePages.forEach((pages, studentId) => {
+          const summary = studentMap.get(studentId);
+          if (summary) {
+            summary.totalPages += pages.size;
+          }
+        });
 
-      // إضافة عدد الاختبارات
-      examData?.forEach(exam => {
-        const summary = studentMap.get(exam.student_id);
-        if (summary) {
-          summary.totalExams += 1;
-        }
-      });
+        // معالجة الغيابات
+        attendanceData?.forEach(att => {
+          const summary = studentMap.get(att.student_id);
+          if (summary) {
+            summary.absenceCount++;
+          }
+        });
 
-      const summaryArray = Array.from(studentMap.values());
-      setRecords(summaryArray);
+        // إضافة عدد الاختبارات
+        examData?.forEach(exam => {
+          const summary = studentMap.get(exam.student_id);
+          if (summary) {
+            summary.examsCount += 1;
+          }
+        });
+
+        // تحديث آخر صفحة
+        studentLastPages.forEach((page, studentId) => {
+          const summary = studentMap.get(studentId);
+          if (summary) {
+            summary.lastPage = page;
+          }
+        });
+
+        // حساب نقاط الترتيب (الصفحات + الاختبارات × 2)
+        const summaryArray = Array.from(studentMap.values());
+        summaryArray.forEach(record => {
+          record.rankingScore = record.totalPages + (record.examsCount * 2);
+        });
+
+        // ترتيب من الأعلى إلى الأدنى
+        summaryArray.sort((a, b) => b.rankingScore - a.rankingScore);
+
+        setRecords(summaryArray);
+      } else {
+        // المنطق القديم للعرض الشهري
+        const studentMap = new Map<string, StudentSummary>();
+        activeStudents.forEach(student => {
+          studentMap.set(student.id, {
+            student_id: student.id,
+            studentName: student.name,
+            circleName: student.circles?.name || 'غير محدد',
+            totalRecitationPages: 0,
+            totalReviewPages: 0,
+            totalHadithCount: 0,
+            totalExams: 0,
+          });
+        });
+
+        // جلب بيانات الأعمال اليومية
+        const { data: workData, error: workError } = await supabase
+          .from('student_daily_work')
+          .select('student_id, new_recitation_pages, review_pages, hadith_count, new_recitation_grade')
+          .gte('date', dateFilter)
+          .in('student_id', Array.from(studentMap.keys()));
+
+        if (workError) throw workError;
+
+        // جلب بيانات تسميعات التمهيديين
+        const { data: beginnerData, error: beginnerError } = await supabase
+          .from('student_beginner_recitations')
+          .select('student_id, page_number, grade')
+          .gte('date', dateFilter)
+          .in('student_id', Array.from(studentMap.keys()));
+
+        if (beginnerError) throw beginnerError;
+
+        // جلب بيانات الاختبارات
+        const { data: examData, error: examError } = await supabase
+          .from('student_exams')
+          .select('student_id, id')
+          .gte('exam_date', dateFilter)
+          .in('student_id', Array.from(studentMap.keys()));
+
+        if (examError) throw examError;
+
+        // إضافة بيانات الأعمال اليومية (استثناء الإعادات)
+        workData?.forEach(work => {
+          const summary = studentMap.get(work.student_id);
+          if (summary) {
+            // حساب الصفحات فقط إذا لم تكن إعادة
+            if (work.new_recitation_grade !== 'إعادة') {
+              summary.totalRecitationPages += work.new_recitation_pages || 0;
+            }
+            summary.totalReviewPages += work.review_pages || 0;
+            summary.totalHadithCount += work.hadith_count || 0;
+          }
+        });
+
+        // إضافة بيانات التمهيديين (حساب الصفحات الفريدة، استثناء الإعادات)
+        const studentUniquePages = new Map<string, Set<number>>();
+        beginnerData?.forEach(rec => {
+          const summary = studentMap.get(rec.student_id);
+          if (summary && rec.grade !== 'إعادة') {
+            if (!studentUniquePages.has(rec.student_id)) {
+              studentUniquePages.set(rec.student_id, new Set());
+            }
+            studentUniquePages.get(rec.student_id)!.add(rec.page_number);
+          }
+        });
+
+        // إضافة عدد الصفحات الفريدة للتمهيديين
+        studentUniquePages.forEach((pages, studentId) => {
+          const summary = studentMap.get(studentId);
+          if (summary) {
+            summary.totalRecitationPages += pages.size;
+          }
+        });
+
+        // إضافة عدد الاختبارات
+        examData?.forEach(exam => {
+          const summary = studentMap.get(exam.student_id);
+          if (summary) {
+            summary.totalExams += 1;
+          }
+        });
+
+        const summaryArray = Array.from(studentMap.values());
+        setRecords(summaryArray);
+      }
     } catch (error) {
       console.error('Error fetching records:', error);
       toast({
@@ -543,19 +693,33 @@ const AdminStudentRecords = () => {
   ];
 
   const handleExportBasicRecords = () => {
-    const exportData = records.map((record, index) => ({
-      'الرقم': index + 1,
-      'اسم الطالب': record.studentName,
-      'الحلقة': record.circleName,
-      'صفحات التسميع': record.totalRecitationPages,
-      'صفحات المراجعة': record.totalReviewPages,
-      'الأحاديث': record.totalHadithCount,
-      'الاختبارات': record.totalExams,
-    }));
+    let exportData;
+    
+    if (selectedView === 'weekly') {
+      exportData = (records as StudentWeeklySummary[]).map((record, index) => ({
+        'الرقم': index + 1,
+        'اسم الطالب': record.studentName,
+        'الحلقة': record.circleName,
+        'الصفحات المسمعة': record.totalPages,
+        'عدد الاختبارات': record.examsCount,
+        'آخر صفحة': record.lastPage,
+        'الغيابات': record.absenceCount,
+      }));
+    } else {
+      exportData = (records as StudentSummary[]).map((record, index) => ({
+        'الرقم': index + 1,
+        'اسم الطالب': record.studentName,
+        'الحلقة': record.circleName,
+        'صفحات التسميع': record.totalRecitationPages,
+        'صفحات المراجعة': record.totalReviewPages,
+        'الأحاديث': record.totalHadithCount,
+        'الاختبارات': record.totalExams,
+      }));
+    }
 
     const viewType = selectedView === 'weekly' ? 'أسبوعي' : 'شهري';
     const circleName = selectedCircle === 'all' ? 'جميع_الحلقات' : circles.find(c => c.id === selectedCircle)?.name || 'حلقة';
-    exportToExcel(exportData, `سجلات_الطلاب_${viewType}_${circleName}_${new Date().toLocaleDateString('ar-SA')}`, 'السجلات الأساسية');
+    exportToExcel(exportData, `سجلات_الطلاب_${viewType}_${circleName}_${new Date().toLocaleDateString('ar-SA')}`, selectedView === 'weekly' ? 'أسبوعية' : 'السجلات الأساسية');
     
     toast({
       title: "تم التصدير بنجاح",
@@ -632,11 +796,11 @@ const AdminStudentRecords = () => {
             {/* Tabs للسجلات الأساسية والمحصلات */}
             <Tabs defaultValue="basic" className="w-full">
               <TabsList className="grid w-full grid-cols-2 mb-6">
-                <TabsTrigger value="basic">السجلات الأساسية</TabsTrigger>
+                <TabsTrigger value="basic">أسبوعية</TabsTrigger>
                 <TabsTrigger value="summary" onClick={() => fetchSummaryRecords()}>المحصلات الشهرية والفصلية</TabsTrigger>
               </TabsList>
 
-              {/* السجلات الأساسية */}
+              {/* السجلات الأسبوعية */}
               <TabsContent value="basic">
                 {!loading && records.length > 0 && (
                   <div className="mb-4 flex justify-end">
@@ -658,6 +822,47 @@ const AdminStudentRecords = () => {
                       لا توجد سجلات للفترة {selectedView === 'weekly' ? 'الأسبوعية' : 'الشهرية'} المحددة
                     </p>
                   </div>
+                ) : selectedView === 'weekly' ? (
+                  <div className="overflow-x-auto" dir="rtl">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-primary/5">
+                          <TableHead className="text-center font-bold">اسم الطالب</TableHead>
+                          <TableHead className="text-right font-bold">الحلقة</TableHead>
+                          <TableHead className="text-center font-bold">الصفحات المسمعة</TableHead>
+                          <TableHead className="text-center font-bold">عدد الاختبارات</TableHead>
+                          <TableHead className="text-center font-bold">آخر صفحة</TableHead>
+                          <TableHead className="text-center font-bold">الغيابات</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {(records as StudentWeeklySummary[]).map((record) => (
+                          <TableRow key={record.student_id} className="hover:bg-muted/50 transition-colors">
+                            <TableCell className="text-center font-semibold text-foreground">{record.studentName}</TableCell>
+                            <TableCell>{record.circleName}</TableCell>
+                            <TableCell className="text-center">
+                              <span className="inline-flex items-center justify-center px-3 py-1 rounded-full bg-primary/10 text-primary font-semibold">
+                                {record.totalPages}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <span className="inline-flex items-center justify-center px-3 py-1 rounded-full bg-secondary/10 text-secondary font-semibold">
+                                {record.examsCount}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-center text-sm text-muted-foreground">{record.lastPage}</TableCell>
+                            <TableCell className="text-center">
+                              <span className={`inline-flex items-center justify-center px-3 py-1 rounded-full font-semibold ${
+                                record.absenceCount > 3 ? 'bg-destructive/10 text-destructive' : 'bg-muted text-muted-foreground'
+                              }`}>
+                                {record.absenceCount}
+                              </span>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
                 ) : (
                   <div className="overflow-x-auto" dir="rtl">
                     <Table>
@@ -672,7 +877,7 @@ const AdminStudentRecords = () => {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {records.map((record) => (
+                        {(records as StudentSummary[]).map((record) => (
                           <TableRow key={record.student_id}>
                             <TableCell className="text-center font-medium">{record.studentName}</TableCell>
                             <TableCell>{record.circleName}</TableCell>

@@ -4,7 +4,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Download, Trash2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Download, Trash2, Edit, X, Save } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { exportToExcel } from "@/lib/exportToExcel";
@@ -18,6 +21,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface Exam {
   id: string;
@@ -52,6 +63,9 @@ const AdminExamRecords = () => {
   const [selectedCircle, setSelectedCircle] = useState<string>("all");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [examToDelete, setExamToDelete] = useState<string | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [examToEdit, setExamToEdit] = useState<Exam | null>(null);
+  const [editFormData, setEditFormData] = useState<Partial<Exam>>({});
   const { toast } = useToast();
 
   useEffect(() => {
@@ -110,6 +124,56 @@ const AdminExamRecords = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleEditClick = (exam: Exam) => {
+    setExamToEdit(exam);
+    setEditFormData({
+      exam_date: exam.exam_date,
+      juz_number: exam.juz_number,
+      attempt_number: exam.attempt_number,
+      exam_score: exam.exam_score,
+      tajweed_score: exam.tajweed_score,
+      tafsir_score: exam.tafsir_score,
+      surah_memory_score: exam.surah_memory_score,
+      stability_score: exam.stability_score,
+      grade: exam.grade,
+      notes: exam.notes,
+      tamhidi_stage: exam.tamhidi_stage,
+      tilawah_section: exam.tilawah_section,
+      hifd_section: exam.hifd_section,
+    });
+    setEditDialogOpen(true);
+  };
+
+  const handleEditSave = async () => {
+    if (!examToEdit) return;
+
+    try {
+      const { error } = await supabase
+        .from('student_exams')
+        .update(editFormData)
+        .eq('id', examToEdit.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "تم التحديث بنجاح",
+        description: "تم تحديث بيانات الاختبار",
+      });
+
+      setEditDialogOpen(false);
+      setExamToEdit(null);
+      setEditFormData({});
+      fetchExams();
+    } catch (error) {
+      console.error('Error updating exam:', error);
+      toast({
+        title: "خطأ",
+        description: "فشل في تحديث بيانات الاختبار",
+        variant: "destructive",
+      });
     }
   };
 
@@ -320,14 +384,24 @@ const AdminExamRecords = () => {
                           {exam.notes || '-'}
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteClick(exam.id)}
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
+                          <div className="flex gap-2 justify-end">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEditClick(exam)}
+                              className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteClick(exam.id)}
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))
@@ -339,6 +413,173 @@ const AdminExamRecords = () => {
         </Card>
       </div>
 
+      {/* Edit Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" dir="rtl">
+          <DialogHeader>
+            <DialogTitle className="text-right">تعديل بيانات الاختبار</DialogTitle>
+            <DialogDescription className="text-right">
+              قم بتعديل بيانات الاختبار للطالب: {examToEdit?.student_name}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="exam_date" className="text-right">تاريخ الاختبار</Label>
+              <Input
+                id="exam_date"
+                type="date"
+                value={editFormData.exam_date || ''}
+                onChange={(e) => setEditFormData({...editFormData, exam_date: e.target.value})}
+                className="text-right"
+              />
+            </div>
+
+            {examToEdit?.student_level === 'حافظ' && (
+              <div className="grid gap-2">
+                <Label htmlFor="juz_number" className="text-right">رقم الجزء</Label>
+                <Input
+                  id="juz_number"
+                  type="number"
+                  min="1"
+                  max="30"
+                  value={editFormData.juz_number || ''}
+                  onChange={(e) => setEditFormData({...editFormData, juz_number: parseInt(e.target.value) || null})}
+                  className="text-right"
+                />
+              </div>
+            )}
+
+            <div className="grid gap-2">
+              <Label htmlFor="attempt_number" className="text-right">رقم المحاولة</Label>
+              <Input
+                id="attempt_number"
+                type="number"
+                min="1"
+                value={editFormData.attempt_number || 1}
+                onChange={(e) => setEditFormData({...editFormData, attempt_number: parseInt(e.target.value) || 1})}
+                className="text-right"
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="exam_score" className="text-right">العلامة الكلية</Label>
+              <Input
+                id="exam_score"
+                type="number"
+                min="0"
+                max="100"
+                value={editFormData.exam_score || ''}
+                onChange={(e) => setEditFormData({...editFormData, exam_score: parseFloat(e.target.value) || null})}
+                className="text-right"
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="grade" className="text-right">التقييم</Label>
+              <Select 
+                value={editFormData.grade || ''} 
+                onValueChange={(value) => setEditFormData({...editFormData, grade: value})}
+              >
+                <SelectTrigger className="text-right">
+                  <SelectValue placeholder="اختر التقييم" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ممتاز">ممتاز</SelectItem>
+                  <SelectItem value="جيد جداً">جيد جداً</SelectItem>
+                  <SelectItem value="جيد">جيد</SelectItem>
+                  <SelectItem value="مقبول">مقبول</SelectItem>
+                  <SelectItem value="إعادة">إعادة</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="tajweed_score" className="text-right">التجويد النظري (من 10)</Label>
+              <Input
+                id="tajweed_score"
+                type="number"
+                min="0"
+                max="10"
+                step="0.5"
+                value={editFormData.tajweed_score || ''}
+                onChange={(e) => setEditFormData({...editFormData, tajweed_score: parseFloat(e.target.value) || null})}
+                className="text-right"
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="surah_memory_score" className="text-right">حفظ السور (من 10)</Label>
+              <Input
+                id="surah_memory_score"
+                type="number"
+                min="0"
+                max="10"
+                step="0.5"
+                value={editFormData.surah_memory_score || ''}
+                onChange={(e) => setEditFormData({...editFormData, surah_memory_score: parseFloat(e.target.value) || null})}
+                className="text-right"
+              />
+            </div>
+
+            {examToEdit?.student_level === 'تلاوة' && (
+              <div className="grid gap-2">
+                <Label htmlFor="tafsir_score" className="text-right">التفسير (من 10)</Label>
+                <Input
+                  id="tafsir_score"
+                  type="number"
+                  min="0"
+                  max="10"
+                  step="0.5"
+                  value={editFormData.tafsir_score || ''}
+                  onChange={(e) => setEditFormData({...editFormData, tafsir_score: parseFloat(e.target.value) || null})}
+                  className="text-right"
+                />
+              </div>
+            )}
+
+            {examToEdit?.student_level === 'حافظ' && (
+              <div className="grid gap-2">
+                <Label htmlFor="stability_score" className="text-right">الثبات (من 10)</Label>
+                <Input
+                  id="stability_score"
+                  type="number"
+                  min="0"
+                  max="10"
+                  step="0.5"
+                  value={editFormData.stability_score || ''}
+                  onChange={(e) => setEditFormData({...editFormData, stability_score: parseFloat(e.target.value) || null})}
+                  className="text-right"
+                />
+              </div>
+            )}
+
+            <div className="grid gap-2">
+              <Label htmlFor="notes" className="text-right">ملاحظات</Label>
+              <Textarea
+                id="notes"
+                value={editFormData.notes || ''}
+                onChange={(e) => setEditFormData({...editFormData, notes: e.target.value})}
+                className="text-right min-h-[100px]"
+                placeholder="أضف ملاحظات إضافية..."
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
+              <X className="w-4 h-4 ml-2" />
+              إلغاء
+            </Button>
+            <Button onClick={handleEditSave} className="bg-primary">
+              <Save className="w-4 h-4 ml-2" />
+              حفظ التعديلات
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
