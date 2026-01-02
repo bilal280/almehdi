@@ -302,41 +302,6 @@ const QuickDataEntry = () => {
   const updateRegularRecitation = (studentId: string, index: number, field: keyof RegularRecitation, value: any) => {
     // التحقق من صحة أرقام الصفحات
     if (field === 'pageNumbers') {
-      // معالجة النطاقات (مثل 10-15) وتحويلها إلى قائمة
-      let processedValue = value;
-      
-      // البحث عن نطاقات (مثل 10-15)
-      const rangePattern = /(\d+)\s*-\s*(\d+)/g;
-      const ranges = [...value.matchAll(rangePattern)];
-      
-      if (ranges.length > 0) {
-        let expandedPages: string[] = [];
-        let remainingText = value;
-        
-        ranges.forEach(match => {
-          const start = parseInt(match[1]);
-          const end = parseInt(match[2]);
-          
-          if (start <= end) {
-            // توليد جميع الأرقام في النطاق
-            for (let i = start; i <= end; i++) {
-              expandedPages.push(i.toString());
-            }
-          }
-          
-          // إزالة النطاق من النص
-          remainingText = remainingText.replace(match[0], '');
-        });
-        
-        // إضافة أي أرقام أخرى موجودة
-        const otherPages = remainingText.split(',')
-          .map(p => p.trim())
-          .filter(p => p && /^\d+$/.test(p));
-        
-        expandedPages = [...expandedPages, ...otherPages];
-        processedValue = expandedPages.join(',');
-      }
-      
       // السماح فقط بالأرقام والفواصل والمسافات والشرطة
       const validPattern = /^[0-9,\s-]*$/;
       if (!validPattern.test(value)) {
@@ -347,8 +312,6 @@ const QuickDataEntry = () => {
         });
         return;
       }
-      
-      value = processedValue;
     }
 
     setStudentData(prev => {
@@ -362,6 +325,59 @@ const QuickDataEntry = () => {
         }
       };
     });
+  };
+
+  // دالة لتوسيع النطاقات عند الانتهاء من الكتابة
+  const expandPageRanges = (studentId: string, index: number) => {
+    const rec = studentData[studentId].regularRecitations[index];
+    if (!rec.pageNumbers) return;
+
+    let value = rec.pageNumbers;
+    
+    // البحث عن نطاقات (مثل 10-15)
+    const rangePattern = /(\d+)\s*-\s*(\d+)/g;
+    const ranges = [...value.matchAll(rangePattern)];
+    
+    if (ranges.length > 0) {
+      let expandedPages: string[] = [];
+      let remainingText = value;
+      
+      ranges.forEach(match => {
+        const start = parseInt(match[1]);
+        const end = parseInt(match[2]);
+        
+        if (start <= end) {
+          // توليد جميع الأرقام في النطاق
+          for (let i = start; i <= end; i++) {
+            expandedPages.push(i.toString());
+          }
+        }
+        
+        // إزالة النطاق من النص
+        remainingText = remainingText.replace(match[0], '');
+      });
+      
+      // إضافة أي أرقام أخرى موجودة
+      const otherPages = remainingText.split(',')
+        .map(p => p.trim())
+        .filter(p => p && /^\d+$/.test(p));
+      
+      expandedPages = [...expandedPages, ...otherPages];
+      const processedValue = expandedPages.join(',');
+      
+      // تحديث القيمة
+      setStudentData(prev => {
+        const updated = [...prev[studentId].regularRecitations];
+        updated[index] = { ...updated[index], pageNumbers: processedValue };
+        return {
+          ...prev,
+          [studentId]: {
+            ...prev[studentId],
+            regularRecitations: updated
+          }
+        };
+      });
+    }
   };
 
   // للطلاب التمهيديين
@@ -1251,6 +1267,7 @@ const QuickDataEntry = () => {
                                     placeholder="201,202,203 أو 201-210"
                                     value={rec.pageNumbers}
                                     onChange={(e) => updateRegularRecitation(student.id, index, 'pageNumbers', e.target.value)}
+                                    onBlur={() => expandPageRanges(student.id, index)}
                                     className="h-9"
                                   />
                                   <p className="text-xs text-muted-foreground mt-1">افصل بفاصلة أو استخدم - للنطاق (مثال: 10-15)</p>
