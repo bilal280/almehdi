@@ -825,18 +825,18 @@ const DynamicStudentReport = () => {
   };
 
   const months = [
-    { value: "0", label: "يناير" },
-    { value: "1", label: "فبراير" },
-    { value: "2", label: "مارس" },
-    { value: "3", label: "أبريل" },
-    { value: "4", label: "مايو" },
-    { value: "5", label: "يونيو" },
-    { value: "6", label: "يوليو" },
-    { value: "7", label: "أغسطس" },
-    { value: "8", label: "سبتمبر" },
-    { value: "9", label: "أكتوبر" },
-    { value: "10", label: "نوفمبر" },
-    { value: "11", label: "ديسمبر" },
+    { value: "0", label: "كانون الثاني (1)" },
+    { value: "1", label: "شباط (2)" },
+    { value: "2", label: "آذار (3)" },
+    { value: "3", label: "نيسان (4)" },
+    { value: "4", label: "أيار (5)" },
+    { value: "5", label: "حزيران (6)" },
+    { value: "6", label: "تموز (7)" },
+    { value: "7", label: "آب (8)" },
+    { value: "8", label: "أيلول (9)" },
+    { value: "9", label: "تشرين الأول (10)" },
+    { value: "10", label: "تشرين الثاني (11)" },
+    { value: "11", label: "كانون الأول (12)" },
   ];
 
   return (
@@ -955,7 +955,72 @@ const DynamicStudentReport = () => {
                     </div>
                   ) : (
                     <div className="overflow-x-auto" dir="rtl">
-                      <Table>
+                      <div className="space-y-4 md:hidden">
+                        {/* عرض الموبايل - كاردات */}
+                        {allExams.map((exam) => (
+                          <div key={exam.id} className="bg-muted/30 rounded-lg p-4 border border-primary/20 space-y-2">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <div className="font-bold text-lg">{getExamSection(exam)}</div>
+                                <div className="text-sm text-muted-foreground">
+                                  {new Date(exam.exam_date).toLocaleDateString('ar-EG')}
+                                </div>
+                              </div>
+                              <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                exam.grade === 'ممتاز' ? 'bg-green-100 text-green-800' :
+                                exam.grade === 'جيد جداً' ? 'bg-blue-100 text-blue-800' :
+                                exam.grade === 'جيد' ? 'bg-yellow-100 text-yellow-800' :
+                                exam.grade === 'مقبول' ? 'bg-orange-100 text-orange-800' :
+                                exam.grade === 'إعادة' ? 'bg-red-100 text-red-800' :
+                                'bg-gray-100 text-gray-800'
+                              }`}>
+                                {exam.grade || '-'}
+                              </span>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-2 text-sm">
+                              <div>
+                                <span className="text-muted-foreground">المحاولة: </span>
+                                <span className="font-medium">{exam.attempt_number}</span>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground">العلامة: </span>
+                                <span className="font-bold">{exam.exam_score !== null ? exam.exam_score : '-'}</span>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground">التجويد: </span>
+                                <span className="font-medium">{exam.tajweed_score !== null ? `${exam.tajweed_score}/10` : '-'}</span>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground">حفظ السور: </span>
+                                <span className="font-medium">{exam.surah_memory_score !== null ? `${exam.surah_memory_score}/10` : '-'}</span>
+                              </div>
+                              {studentData.level === 'تلاوة' && exam.tafsir_score !== null && (
+                                <div>
+                                  <span className="text-muted-foreground">تفسير: </span>
+                                  <span className="font-medium">{exam.tafsir_score}/10</span>
+                                </div>
+                              )}
+                              {studentData.level === 'حافظ' && exam.stability_score !== null && (
+                                <div>
+                                  <span className="text-muted-foreground">ثبات: </span>
+                                  <span className="font-medium">{exam.stability_score}/10</span>
+                                </div>
+                              )}
+                            </div>
+                            
+                            {exam.notes && (
+                              <div className="text-sm pt-2 border-t">
+                                <span className="text-muted-foreground">ملاحظات: </span>
+                                <span>{exam.notes}</span>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                      
+                      {/* عرض الكمبيوتر - جدول */}
+                      <Table className="hidden md:table">
                         <TableHeader>
                           <TableRow>
                             <TableHead className="text-right">التاريخ</TableHead>

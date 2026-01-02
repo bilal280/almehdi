@@ -12,8 +12,7 @@ import {
   Award, 
   ClipboardList,
   Settings,
-  ChevronRight,
-  BarChart3
+  ChevronRight
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -153,7 +152,7 @@ const AdminDashboard = () => {
       title: "سجلات الطلاب",
       description: "عرض السجلات والمحصلات الأسبوعية والشهرية",
       icon: FileText,
-      path: "/admin/student-records",
+      path: "/admin/records",
       color: "text-orange-600",
       bgGradient: "from-orange-500/10 to-orange-600/10"
     },
@@ -174,20 +173,36 @@ const AdminDashboard = () => {
       bgGradient: "from-indigo-500/10 to-indigo-600/10"
     },
     {
-      title: "التقارير والإحصائيات",
-      description: "تقارير شاملة عن أداء المعهد",
-      icon: BarChart3,
-      path: "/admin/reports",
+      title: "إدارة النقاط",
+      description: "إضافة وتعديل نقاط الطلاب",
+      icon: Award,
+      path: "/admin/points",
+      color: "text-yellow-600",
+      bgGradient: "from-yellow-500/10 to-yellow-600/10"
+    },
+    {
+      title: "سجل الغياب",
+      description: "عرض وإدارة غيابات الطلاب",
+      icon: UserCheck,
+      path: "/admin/attendance",
       color: "text-cyan-600",
       bgGradient: "from-cyan-500/10 to-cyan-600/10"
     },
     {
-      title: "الإعدادات",
-      description: "إعدادات النظام والصلاحيات",
+      title: "وضع الصيانة",
+      description: "تفعيل وإيقاف وضع الصيانة للنظام",
       icon: Settings,
-      path: "/admin/settings",
+      path: "/admin/maintenance",
       color: "text-gray-600",
       bgGradient: "from-gray-500/10 to-gray-600/10"
+    },
+    {
+      title: "الطلاب المنقطعين",
+      description: "عرض وإدارة الطلاب المنقطعين",
+      icon: Users,
+      path: "/admin/discontinued-students",
+      color: "text-red-600",
+      bgGradient: "from-red-500/10 to-red-600/10"
     }
   ];
 

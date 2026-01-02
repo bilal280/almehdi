@@ -36,6 +36,51 @@ const ExamManagement = () => {
   const [examScore, setExamScore] = useState("");
   const [grade, setGrade] = useState("");
   const [tajweedScore, setTajweedScore] = useState("");
+
+  // دالة لحساب التقدير تلقائياً بناءً على العلامة ومستوى الطالب
+  const calculateGrade = (score: number, level: string): string => {
+    if (!score || score < 0 || score > 100) return "";
+    
+    if (level === "تمهيدي") {
+      // سلم التمهيدي
+      if (score === 100) return "شرف";
+      if (score >= 97 && score <= 99) return "تفوق";
+      if (score >= 94 && score <= 96) return "ممتاز";
+      if (score >= 90 && score <= 93) return "جيد جداً";
+      if (score >= 85 && score <= 89) return "جيد";
+      if (score >= 80 && score <= 84) return "مقبول";
+      return "إعادة";
+    } else if (level === "حافظ") {
+      // سلم التوحيد (الحافظ)
+      if (score === 100) return "شرف";
+      if (score >= 98 && score <= 99) return "تفوق";
+      if (score >= 96 && score <= 97) return "ممتاز";
+      if (score >= 94 && score <= 95) return "جيد جداً";
+      if (score >= 92 && score <= 93) return "جيد";
+      if (score >= 90 && score <= 91) return "مقبول";
+      return "إعادة";
+    } else {
+      // سلم التلاوة (افتراضي - نفس التمهيدي)
+      if (score === 100) return "شرف";
+      if (score >= 97 && score <= 99) return "تفوق";
+      if (score >= 94 && score <= 96) return "ممتاز";
+      if (score >= 90 && score <= 93) return "جيد جداً";
+      if (score >= 85 && score <= 89) return "جيد";
+      if (score >= 80 && score <= 84) return "مقبول";
+      return "إعادة";
+    }
+  };
+
+  // تحديث التقدير تلقائياً عند تغيير العلامة
+  useEffect(() => {
+    if (examScore && selectedStudentLevel) {
+      const score = parseFloat(examScore);
+      const calculatedGrade = calculateGrade(score, selectedStudentLevel);
+      setGrade(calculatedGrade);
+    } else {
+      setGrade("");
+    }
+  }, [examScore, selectedStudentLevel]);
   const [surahMemoryScore, setSurahMemoryScore] = useState("");
   const [notes, setNotes] = useState("");
   
@@ -456,14 +501,40 @@ const ExamManagement = () => {
                   <div className="border-t pt-6 space-y-4">
                     <h3 className="text-lg font-bold text-primary text-right">النتيجة</h3>
                     
+                    {/* رسالة توضيحية عن سلم التقديرات */}
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-right">
+                      <p className="text-sm font-semibold text-blue-900 mb-2">📊 سلم التقديرات حسب المستوى:</p>
+                      {selectedStudentLevel === "تمهيدي" && (
+                        <div className="text-xs text-blue-800 space-y-1">
+                          <p>• شرف: 100 | تفوق: 97-99 | ممتاز: 94-96</p>
+                          <p>• جيد جداً: 90-93 | جيد: 85-89 | مقبول: 80-84</p>
+                        </div>
+                      )}
+                      {selectedStudentLevel === "حافظ" && (
+                        <div className="text-xs text-blue-800 space-y-1">
+                          <p>• شرف: 100 | تفوق: 98-99 | ممتاز: 96-97</p>
+                          <p>• جيد جداً: 94-95 | جيد: 92-93 | مقبول: 90-91</p>
+                        </div>
+                      )}
+                      {selectedStudentLevel === "تلاوة" && (
+                        <div className="text-xs text-blue-800 space-y-1">
+                          <p>• شرف: 100 | تفوق: 97-99 | ممتاز: 94-96</p>
+                          <p>• جيد جداً: 90-93 | جيد: 85-89 | مقبول: 80-84</p>
+                        </div>
+                      )}
+                      <p className="text-xs text-blue-700 mt-2 italic">* التقدير يُحسب تلقائياً عند إدخال العلامة</p>
+                    </div>
+                    
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {/* العلامة */}
                       <div className="space-y-2">
-                        <Label htmlFor="examScore" className="text-right block">العلامة</Label>
+                        <Label htmlFor="examScore" className="text-right block">العلامة *</Label>
                         <Input
                           id="examScore"
                           type="number"
                           step="0.5"
+                          min="0"
+                          max="100"
                           value={examScore}
                           onChange={(e) => setExamScore(e.target.value)}
                           placeholder="أدخل العلامة"
@@ -471,21 +542,18 @@ const ExamManagement = () => {
                         />
                       </div>
 
-                      {/* التقييم */}
+                      {/* التقييم - يتم حسابه تلقائياً */}
                       <div className="space-y-2">
-                        <Label htmlFor="grade" className="text-right block">التقييم</Label>
-                        <Select value={grade} onValueChange={setGrade}>
-                          <SelectTrigger className="text-right bg-background">
-                            <SelectValue placeholder="اختر التقييم" />
-                          </SelectTrigger>
-                          <SelectContent className="bg-background z-50">
-                            <SelectItem value="ممتاز">ممتاز</SelectItem>
-                            <SelectItem value="جيد جداً">جيد جداً</SelectItem>
-                            <SelectItem value="جيد">جيد</SelectItem>
-                            <SelectItem value="مقبول">مقبول</SelectItem>
-                            <SelectItem value="إعادة">إعادة</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <Label htmlFor="grade" className="text-right block">التقييم (تلقائي)</Label>
+                        <Input
+                          id="grade"
+                          type="text"
+                          value={grade}
+                          readOnly
+                          disabled
+                          placeholder="يتم حسابه تلقائياً"
+                          className="text-right bg-muted"
+                        />
                       </div>
 
                       {/* علامة التجويد النظري (اختيارية) */}

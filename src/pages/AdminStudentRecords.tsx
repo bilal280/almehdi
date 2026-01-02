@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { FileText, Download } from "lucide-react";
+import { FileText, Download, Calendar } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -31,6 +31,12 @@ interface StudentWeeklySummary {
   rankingScore: number;
 }
 
+interface WeeklyRecordsGroup {
+  weekNumber: number;
+  weekLabel: string;
+  records: StudentWeeklySummary[];
+}
+
 interface StudentMonthlyRecord {
   student_id: string;
   studentName: string;
@@ -51,9 +57,10 @@ interface Circle {
 }
 
 const AdminStudentRecords = () => {
-  const [selectedView, setSelectedView] = useState<'weekly' | 'monthly'>('weekly');
+  const [selectedView, setSelectedView] = useState<'weekly' | 'monthly' | 'monthWeeks'>('weekly');
   const [selectedCircle, setSelectedCircle] = useState<string>('all');
   const [records, setRecords] = useState<StudentSummary[] | StudentWeeklySummary[]>([]);
+  const [weeklyRecords, setWeeklyRecords] = useState<WeeklyRecordsGroup[]>([]);
   const [circles, setCircles] = useState<Circle[]>([]);
   const [loading, setLoading] = useState(true);
   
@@ -63,6 +70,7 @@ const AdminStudentRecords = () => {
   const [selectedYear, setSelectedYear] = useState<string>(new Date().getFullYear().toString());
   const [availableMonths, setAvailableMonths] = useState<{value: string, label: string}[]>([]);
   const [availableYears, setAvailableYears] = useState<string[]>([]);
+  const [monthYearData, setMonthYearData] = useState<Set<string>>(new Set());
   const [summaryRecords, setSummaryRecords] = useState<StudentMonthlyRecord[]>([]);
   const [loadingSummary, setLoadingSummary] = useState(false);
   
@@ -75,7 +83,197 @@ const AdminStudentRecords = () => {
 
   useEffect(() => {
     fetchRecords();
-  }, [selectedView, selectedCircle]);
+  }, [selectedView, selectedCircle, selectedMonth, selectedYear]);
+
+  const fetchMonthWeeksRecords = async (month: number, year: number) => {
+    // تقسيم الشهر إلى أسابيع
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    
+    const weeks: {weekNumber: number, weekLabel: string, startDate: Date, endDate: Date}[] = [];
+    let weekNumber = 1;
+    let currentDate = new Date(firstDay);
+    
+    while (currentDate <= lastDay) {
+      const weekStart = new Date(currentDate);
+      const weekEnd = new Date(currentDate);
+      weekEnd.setDate(weekEnd.getDate() + 6);
+      
+      if (weekEnd > lastDay) {
+        weekEnd.setTime(lastDay.getTime());
+      }
+      
+      const weekLabel = `الأسبوع ${weekNumber} (${weekStart.getDate()}/${month + 1} - ${weekEnd.getDate()}/${month + 1})`;
+      
+      weeks.push({
+        weekNumber,
+        weekLabel,
+        startDate: weekStart,
+        endDate: weekEnd
+      });
+      
+      currentDate.setDate(currentDate.getDate() + 7);
+      weekNumber++;
+    }
+    
+    // جلب السجلات لكل أسبوع
+    const allWeeklyRecords: WeeklyRecordsGroup[] = [];
+    
+    for (const week of weeks) {
+      const weekRecords = await fetchWeekRecords(week.startDate, week.endDate);
+      allWeeklyRecords.push({
+        weekNumber: week.weekNumber,
+        weekLabel: week.weekLabel,
+        records: weekRecords
+      });
+    }
+    
+    setWeeklyRecords(allWeeklyRecords);
+  };
+
+  const fetchWeekRecords = async (startDate: Date, endDate: Date): Promise<StudentWeeklySummary[]> => {
+    const startDateStr = startDate.toISOString().split('T')[0];
+    const endDateStr = endDate.toISOString().split('T')[0];
+
+    // جلب جميع الطلاب (استثناء المنقطعين)
+    let studentsQuery = supabase
+      .from('students')
+      .select(`
+        id,
+        name,
+        circle_id,
+        circles (
+          name
+        )
+      `)
+      .order('name');
+
+    if (selectedCircle !== 'all') {
+      studentsQuery = studentsQuery.eq('circle_id', selectedCircle);
+    }
+
+    const { data: allStudents } = await studentsQuery;
+
+    const { data: discontinuedStudents } = await supabase
+      .from('discontinued_students')
+      .select('id');
+    
+    const discontinuedIds = new Set(discontinuedStudents?.map(s => s.id) || []);
+    const activeStudents = allStudents?.filter(s => !discontinuedIds.has(s.id)) || [];
+
+    // إنشاء Map لجميع الطلاب النشطين
+    const studentMap = new Map<string, StudentWeeklySummary>();
+    activeStudents.forEach(student => {
+      studentMap.set(student.id, {
+        student_id: student.id,
+        studentName: student.name,
+        circleName: student.circles?.name || 'غير محدد',
+        totalPages: 0,
+        examsCount: 0,
+        lastPage: 'لا يوجد',
+        absenceCount: 0,
+        rankingScore: 0,
+      });
+    });
+
+    // جلب بيانات الأعمال اليومية
+    const { data: workData } = await supabase
+      .from('student_daily_work')
+      .select('*')
+      .gte('date', startDateStr)
+      .lte('date', endDateStr)
+      .in('student_id', Array.from(studentMap.keys()));
+
+    // جلب بيانات تسميعات التمهيديين
+    const { data: beginnerData } = await supabase
+      .from('student_beginner_recitations')
+      .select('*')
+      .gte('date', startDateStr)
+      .lte('date', endDateStr)
+      .in('student_id', Array.from(studentMap.keys()));
+
+    // جلب الغيابات
+    const { data: attendanceData } = await supabase
+      .from('student_attendance')
+      .select('*')
+      .eq('status', 'absent')
+      .gte('date', startDateStr)
+      .lte('date', endDateStr)
+      .in('student_id', Array.from(studentMap.keys()));
+
+    // جلب الاختبارات
+    const { data: examData } = await supabase
+      .from('student_exams')
+      .select('*')
+      .gte('exam_date', startDateStr)
+      .lte('exam_date', endDateStr)
+      .in('student_id', Array.from(studentMap.keys()));
+
+    // معالجة البيانات
+    const studentLastPages = new Map<string, string>();
+    
+    workData?.forEach(work => {
+      const summary = studentMap.get(work.student_id);
+      if (summary && work.new_recitation_grade !== 'إعادة') {
+        summary.totalPages += work.new_recitation_pages || 0;
+        
+        if (work.new_recitation_page_numbers) {
+          const pageNumbers = work.new_recitation_page_numbers.split(',').map((p: string) => p.trim()).filter((p: string) => p);
+          if (pageNumbers.length > 0) {
+            studentLastPages.set(work.student_id, pageNumbers[pageNumbers.length - 1]);
+          }
+        }
+      }
+    });
+
+    const studentUniquePages = new Map<string, Set<number>>();
+    beginnerData?.forEach(rec => {
+      if (rec.grade !== 'إعادة') {
+        if (!studentUniquePages.has(rec.student_id)) {
+          studentUniquePages.set(rec.student_id, new Set());
+        }
+        studentUniquePages.get(rec.student_id)?.add(rec.page_number);
+        studentLastPages.set(rec.student_id, `صفحة ${rec.page_number}`);
+      }
+    });
+
+    studentUniquePages.forEach((pages, studentId) => {
+      const summary = studentMap.get(studentId);
+      if (summary) {
+        summary.totalPages += pages.size;
+      }
+    });
+
+    attendanceData?.forEach(att => {
+      const summary = studentMap.get(att.student_id);
+      if (summary) {
+        summary.absenceCount++;
+      }
+    });
+
+    examData?.forEach(exam => {
+      const summary = studentMap.get(exam.student_id);
+      if (summary) {
+        summary.examsCount++;
+      }
+    });
+
+    studentLastPages.forEach((page, studentId) => {
+      const summary = studentMap.get(studentId);
+      if (summary) {
+        summary.lastPage = page;
+      }
+    });
+
+    const recordsArray = Array.from(studentMap.values());
+    recordsArray.forEach(record => {
+      record.rankingScore = record.totalPages + (record.examsCount * 2);
+    });
+
+    recordsArray.sort((a, b) => b.rankingScore - a.rankingScore);
+
+    return recordsArray;
+  };
 
   const fetchAvailableMonthsAndYears = async () => {
     try {
@@ -107,6 +305,9 @@ const AdminStudentRecords = () => {
         yearSet.add(year.toString());
       });
 
+      // حفظ البيانات للاستخدام لاحقاً
+      setMonthYearData(monthYearSet);
+
       // تحويل إلى مصفوفات
       const years = Array.from(yearSet).sort((a, b) => parseInt(b) - parseInt(a));
       setAvailableYears(years);
@@ -131,6 +332,13 @@ const AdminStudentRecords = () => {
     }
   };
 
+  // تحديث الأشهر عند تغيير السنة
+  useEffect(() => {
+    if (monthYearData.size > 0) {
+      updateAvailableMonths(monthYearData, selectedYear);
+    }
+  }, [selectedYear]);
+
   const fetchCircles = async () => {
     try {
       const { data, error } = await supabase
@@ -153,6 +361,13 @@ const AdminStudentRecords = () => {
       
       if (selectedView === 'weekly') {
         startDate.setDate(today.getDate() - 7);
+      } else if (selectedView === 'monthWeeks') {
+        // عرض أسابيع الشهر الحالي
+        const monthNum = parseInt(selectedMonth);
+        const yearNum = parseInt(selectedYear);
+        await fetchMonthWeeksRecords(monthNum, yearNum);
+        setLoading(false);
+        return;
       } else {
         startDate.setMonth(today.getMonth() - 1);
       }
@@ -230,7 +445,7 @@ const AdminStudentRecords = () => {
         const { data: attendanceData, error: attendanceError } = await supabase
           .from('student_attendance')
           .select('*')
-          .eq('status', 'غائب')
+          .eq('status', 'absent')
           .gte('date', dateFilter)
           .lte('date', endDateStr)
           .in('student_id', Array.from(studentMap.keys()));
@@ -784,14 +999,53 @@ const AdminStudentRecords = () => {
                   </SelectContent>
                 </Select>
 
-                <Tabs value={selectedView} onValueChange={(value) => setSelectedView(value as 'weekly' | 'monthly')}>
-                  <TabsList className="grid w-48 grid-cols-2">
+                <Tabs value={selectedView} onValueChange={(value) => setSelectedView(value as 'weekly' | 'monthly' | 'monthWeeks')}>
+                  <TabsList className="grid w-full grid-cols-3">
                     <TabsTrigger value="weekly">أسبوعي</TabsTrigger>
+                    <TabsTrigger value="monthWeeks">أسابيع الشهر</TabsTrigger>
                     <TabsTrigger value="monthly">شهري</TabsTrigger>
                   </TabsList>
                 </Tabs>
               </div>
             </div>
+
+            {(selectedView === 'monthWeeks') && (
+              <div className="mb-6 flex items-center gap-4 flex-wrap">
+                <Calendar className="w-5 h-5 text-primary" />
+                
+                <Select value={selectedYear} onValueChange={setSelectedYear}>
+                  <SelectTrigger className="w-[150px] bg-background">
+                    <SelectValue placeholder="اختر السنة" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableYears.map(year => (
+                      <SelectItem key={year} value={year}>
+                        {year}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                  <SelectTrigger className="w-[200px] bg-background">
+                    <SelectValue placeholder="اختر الشهر" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableMonths.length > 0 ? (
+                      availableMonths.map(month => (
+                        <SelectItem key={month.value} value={month.value}>
+                          {month.label}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="none" disabled>
+                        لا توجد بيانات لهذه السنة
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             {/* Tabs للسجلات الأساسية والمحصلات */}
             <Tabs defaultValue="basic" className="w-full">
@@ -821,6 +1075,64 @@ const AdminStudentRecords = () => {
                     <p className="text-muted-foreground">
                       لا توجد سجلات للفترة {selectedView === 'weekly' ? 'الأسبوعية' : 'الشهرية'} المحددة
                     </p>
+                  </div>
+                ) : selectedView === 'monthWeeks' ? (
+                  // عرض أسابيع الشهر
+                  <div className="space-y-8">
+                    {weeklyRecords.map((week) => (
+                      <div key={week.weekNumber} className="islamic-card p-6">
+                        <h3 className="text-xl font-bold text-primary mb-4 flex items-center gap-2">
+                          <Calendar className="w-5 h-5" />
+                          {week.weekLabel}
+                        </h3>
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="bg-primary/5">
+                              <TableHead className="text-center font-bold">اسم الطالب</TableHead>
+                              <TableHead className="text-right font-bold">الحلقة</TableHead>
+                              <TableHead className="text-center font-bold">الصفحات المسمعة</TableHead>
+                              <TableHead className="text-center font-bold">عدد الاختبارات</TableHead>
+                              <TableHead className="text-center font-bold">آخر صفحة</TableHead>
+                              <TableHead className="text-center font-bold">الغيابات</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {week.records.length > 0 ? (
+                              week.records.map((record) => (
+                                <TableRow key={record.student_id} className="hover:bg-muted/50 transition-colors">
+                                  <TableCell className="text-center font-medium">{record.studentName}</TableCell>
+                                  <TableCell>{record.circleName}</TableCell>
+                                  <TableCell className="text-center">
+                                    <span className="inline-flex items-center justify-center px-3 py-1 rounded-full bg-primary/10 text-primary font-semibold">
+                                      {record.totalPages}
+                                    </span>
+                                  </TableCell>
+                                  <TableCell className="text-center">
+                                    <span className="inline-flex items-center justify-center px-3 py-1 rounded-full bg-secondary/10 text-secondary font-semibold">
+                                      {record.examsCount}
+                                    </span>
+                                  </TableCell>
+                                  <TableCell className="text-center text-sm text-muted-foreground">{record.lastPage}</TableCell>
+                                  <TableCell className="text-center">
+                                    <span className={`inline-flex items-center justify-center px-3 py-1 rounded-full font-semibold ${
+                                      record.absenceCount > 3 ? 'bg-destructive/10 text-destructive' : 'bg-muted text-muted-foreground'
+                                    }`}>
+                                      {record.absenceCount}
+                                    </span>
+                                  </TableCell>
+                                </TableRow>
+                              ))
+                            ) : (
+                              <TableRow>
+                                <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                                  لا توجد بيانات لهذا الأسبوع
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    ))}
                   </div>
                 ) : selectedView === 'weekly' ? (
                   <div className="overflow-x-auto" dir="rtl">

@@ -75,13 +75,6 @@ const ExamSection = ({ exams }: ExamSectionProps) => {
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
-              {exam.exam_score && (
-                <div className="text-center p-2 bg-background/50 rounded-lg">
-                  <p className="text-xs text-muted-foreground mb-1">العلامة</p>
-                  <p className="text-lg font-bold text-primary">{exam.exam_score}</p>
-                </div>
-              )}
-              
               {exam.grade && (
                 <div className="text-center p-2 bg-background/50 rounded-lg">
                   <p className="text-xs text-muted-foreground mb-1">التقدير</p>

@@ -2,12 +2,10 @@ import { Link, useLocation } from "react-router-dom";
 import { Users, UserCheck, BookOpen, LogOut, Shield, FileText, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { useIsMobile } from "@/hooks/use-mobile";
 import { useState } from "react";
 
 const AdminNavbar = () => {
   const location = useLocation();
-  const isMobile = useIsMobile();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const isActive = (path: string) => location.pathname === path;
@@ -17,11 +15,11 @@ const AdminNavbar = () => {
     { path: "/admin/students", label: "إدارة الطلاب", icon: Users },
     { path: "/admin/teachers", label: "إدارة الأساتذة", icon: UserCheck },
     { path: "/admin/circles", label: "إدارة الحلقات", icon: BookOpen },
-    { path: "/admin/points", label: "إدارة النقاط", icon: Users },
-    { path: "/admin/points-records", label: "سجلات النقاط", icon: FileText },
-    { path: "/admin/attendance", label: "سجل الغياب", icon: UserCheck },
-    { path: "/admin/records", label: "السجلات", icon: FileText },
+    { path: "/admin/records", label: "سجلات الطلاب", icon: FileText },
     { path: "/admin/exam-records", label: "سجلات الاختبارات", icon: FileText },
+    { path: "/admin/points-records", label: "سجلات النقاط", icon: FileText },
+    { path: "/admin/points", label: "إدارة النقاط", icon: Users },
+    { path: "/admin/attendance", label: "سجل الغياب", icon: UserCheck },
     { path: "/admin/maintenance", label: "وضع الصيانة", icon: Shield },
     { path: "/admin/discontinued-students", label: "الطلاب المنقطعين", icon: Users },
   ];
@@ -38,59 +36,38 @@ const AdminNavbar = () => {
               </h1>
             </div>
             
-            {!isMobile ? (
-              <div className="flex items-center space-x-4 space-x-reverse">
-                {navItems.map((item) => {
-                  const Icon = item.icon;
-                  return (
-                    <Link
-                      key={item.path}
-                      to={item.path}
-                      className={`flex items-center space-x-2 space-x-reverse px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                        isActive(item.path)
-                          ? "bg-emerald-100 text-emerald-700"
-                          : "text-gray-600 hover:text-emerald-600 hover:bg-emerald-50"
-                      }`}
-                    >
-                      <Icon className="w-4 h-4" />
-                      <span>{item.label}</span>
-                    </Link>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="flex items-center">
-                <Sheet open={isMenuOpen} onOpenChange={setIsMenuOpen}>
-                  <SheetTrigger asChild>
-                    <Button variant="outline" size="sm" className="text-gray-600 border-gray-200 hover:bg-gray-50">
-                      <Menu className="w-4 h-4" />
-                    </Button>
-                  </SheetTrigger>
-                  <SheetContent side="right" className="w-[85vw] sm:w-[400px]">
-                    <div className="flex flex-col gap-4 mt-8">
-                      {navItems.map((item) => {
-                        const Icon = item.icon;
-                        return (
-                          <Link
-                            key={item.path}
-                            to={item.path}
-                            onClick={() => setIsMenuOpen(false)}
-                            className={`flex items-center gap-3 px-4 py-3 rounded-md font-medium transition-colors ${
-                              isActive(item.path)
-                                ? "bg-emerald-100 text-emerald-700"
-                                : "text-gray-600 hover:text-emerald-600 hover:bg-emerald-50"
-                            }`}
-                          >
-                            <Icon className="w-5 h-5" />
-                            <span>{item.label}</span>
-                          </Link>
-                        );
-                      })}
-                    </div>
-                  </SheetContent>
-                </Sheet>
-              </div>
-            )}
+            {/* دائماً استخدام القائمة الجانبية */}
+            <div className="flex items-center">
+              <Sheet open={isMenuOpen} onOpenChange={setIsMenuOpen}>
+                <SheetTrigger asChild>
+                  <Button variant="outline" size="sm" className="text-gray-600 border-gray-200 hover:bg-gray-50">
+                    <Menu className="w-4 h-4" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="right" className="w-[85vw] sm:w-[400px]">
+                  <div className="flex flex-col gap-4 mt-8">
+                    {navItems.map((item) => {
+                      const Icon = item.icon;
+                      return (
+                        <Link
+                          key={item.path}
+                          to={item.path}
+                          onClick={() => setIsMenuOpen(false)}
+                          className={`flex items-center gap-3 px-4 py-3 rounded-md font-medium transition-colors ${
+                            isActive(item.path)
+                              ? "bg-emerald-100 text-emerald-700"
+                              : "text-gray-600 hover:text-emerald-600 hover:bg-emerald-50"
+                          }`}
+                        >
+                          <Icon className="w-5 h-5" />
+                          <span>{item.label}</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </SheetContent>
+              </Sheet>
+            </div>
           </div>
 
           <Button

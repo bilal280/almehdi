@@ -302,16 +302,53 @@ const QuickDataEntry = () => {
   const updateRegularRecitation = (studentId: string, index: number, field: keyof RegularRecitation, value: any) => {
     // التحقق من صحة أرقام الصفحات
     if (field === 'pageNumbers') {
-      // السماح فقط بالأرقام والفواصل والمسافات
-      const validPattern = /^[0-9,\s]*$/;
+      // معالجة النطاقات (مثل 10-15) وتحويلها إلى قائمة
+      let processedValue = value;
+      
+      // البحث عن نطاقات (مثل 10-15)
+      const rangePattern = /(\d+)\s*-\s*(\d+)/g;
+      const ranges = [...value.matchAll(rangePattern)];
+      
+      if (ranges.length > 0) {
+        let expandedPages: string[] = [];
+        let remainingText = value;
+        
+        ranges.forEach(match => {
+          const start = parseInt(match[1]);
+          const end = parseInt(match[2]);
+          
+          if (start <= end) {
+            // توليد جميع الأرقام في النطاق
+            for (let i = start; i <= end; i++) {
+              expandedPages.push(i.toString());
+            }
+          }
+          
+          // إزالة النطاق من النص
+          remainingText = remainingText.replace(match[0], '');
+        });
+        
+        // إضافة أي أرقام أخرى موجودة
+        const otherPages = remainingText.split(',')
+          .map(p => p.trim())
+          .filter(p => p && /^\d+$/.test(p));
+        
+        expandedPages = [...expandedPages, ...otherPages];
+        processedValue = expandedPages.join(',');
+      }
+      
+      // السماح فقط بالأرقام والفواصل والمسافات والشرطة
+      const validPattern = /^[0-9,\s-]*$/;
       if (!validPattern.test(value)) {
         toast({
           title: "إدخال غير صحيح",
-          description: "يُسمح فقط بالأرقام والفواصل (مثل: 201,202,203)",
+          description: "يُسمح فقط بالأرقام والفواصل والشرطة (مثل: 10-15 أو 201,202)",
           variant: "destructive",
         });
         return;
       }
+      
+      value = processedValue;
     }
 
     setStudentData(prev => {
@@ -1211,12 +1248,12 @@ const QuickDataEntry = () => {
                                   <Label className="text-xs mb-1">أرقام الصفحات</Label>
                                   <Input
                                     type="text"
-                                    placeholder="201,202,203"
+                                    placeholder="201,202,203 أو 201-210"
                                     value={rec.pageNumbers}
                                     onChange={(e) => updateRegularRecitation(student.id, index, 'pageNumbers', e.target.value)}
                                     className="h-9"
                                   />
-                                  <p className="text-xs text-muted-foreground mt-1">افصل بفاصلة</p>
+                                  <p className="text-xs text-muted-foreground mt-1">افصل بفاصلة أو استخدم - للنطاق (مثال: 10-15)</p>
                                 </div>
                                 
                                 <div>
