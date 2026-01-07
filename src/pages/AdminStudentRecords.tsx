@@ -45,6 +45,8 @@ interface StudentMonthlyRecord {
   absenceCount: number;
   lastPage: string;
   examsCount: number;
+  examsInfo: string; // أسماء الاختبارات
+  examsGrades: string; // تقييمات الاختبارات
   retakeCount: number;
   behaviorAverage: string;
   totalPoints: number;
@@ -810,10 +812,21 @@ const AdminStudentRecords = () => {
       // الغيابات
       const absenceCount = attendanceData?.filter(a => a.student_id === studentId).length || 0;
 
-      // الاختبارات
-      const studentExams = examsData?.filter(e => e.student_id === studentId) || [];
+      // الاختبارات (استثناء الإعادات)
+      const studentExams = examsData?.filter(e => e.student_id === studentId && e.attempt_number === 1) || [];
       const examsCount = studentExams.length;
-      const retakeCount = studentExams.filter(e => e.attempt_number > 1).length;
+      const retakeCount = examsData?.filter(e => e.student_id === studentId && e.attempt_number > 1).length || 0;
+      
+      // معلومات الاختبارات
+      const examsInfo = studentExams.map(exam => {
+        if (exam.tamhidi_stage) return exam.tamhidi_stage;
+        if (exam.tilawah_section) return exam.tilawah_section;
+        if (exam.hifd_section) return exam.hifd_section;
+        if (exam.juz_number) return `ج${exam.juz_number}`;
+        return 'اختبار';
+      }).join(', ');
+      
+      const examsGrades = studentExams.map(exam => exam.grade || '-').join(', ');
 
       // متوسط السلوك
       const behaviorAverage = behaviorCount > 0 ? getBehaviorLabel(behaviorSum / behaviorCount) : "غير محدد";
@@ -864,6 +877,8 @@ const AdminStudentRecords = () => {
         absenceCount,
         lastPage,
         examsCount,
+        examsInfo: examsInfo || '-',
+        examsGrades: examsGrades || '-',
         retakeCount,
         behaviorAverage,
         totalPoints: totalPointsSum,
@@ -1275,7 +1290,8 @@ const AdminStudentRecords = () => {
                             <TableHead className="text-center">مجموع الصفحات</TableHead>
                             <TableHead className="text-center">الغيابات</TableHead>
                             <TableHead className="text-center">آخر صفحة</TableHead>
-                            <TableHead className="text-center">عدد الاختبارات</TableHead>
+                            <TableHead className="text-center">الاختبارات</TableHead>
+                            <TableHead className="text-center">التقييمات</TableHead>
                             <TableHead className="text-center">الإعادة</TableHead>
                             <TableHead className="text-center">متوسط السلوك</TableHead>
                             <TableHead className="text-center">المذاكرة الشهرية</TableHead>
@@ -1290,7 +1306,8 @@ const AdminStudentRecords = () => {
                               <TableCell className="text-center">{record.totalPages}</TableCell>
                               <TableCell className="text-center">{record.absenceCount}</TableCell>
                               <TableCell className="text-center">{record.lastPage}</TableCell>
-                              <TableCell className="text-center">{record.examsCount}</TableCell>
+                              <TableCell className="text-center text-sm">{record.examsInfo}</TableCell>
+                              <TableCell className="text-center text-sm">{record.examsGrades}</TableCell>
                               <TableCell className="text-center">{record.retakeCount}</TableCell>
                               <TableCell className="text-center">{record.behaviorAverage}</TableCell>
                               <TableCell className="text-center">

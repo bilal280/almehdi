@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BookOpen, RotateCcw, Scroll, Heart, MessageSquare, Award, Plus, Minus } from "lucide-react";
+import { BookOpen, RotateCcw, Scroll, Heart, MessageSquare, Award, Plus, Minus, User, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,8 +7,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { getEffectiveDate } from "@/lib/utils";
 
 interface Student {
   id: string;
@@ -177,6 +179,8 @@ const AddStudentWork = ({ student, onClose }: AddStudentWorkProps) => {
     setLoading(true);
 
     try {
+      const today = getEffectiveDate();
+
       // تحقق إذا كان الطالب تمهيدي
       if (student.level === 'تمهيدي') {
         // التحقق من أن جميع التسميعات لها تقدير
@@ -204,6 +208,7 @@ const AddStudentWork = ({ student, onClose }: AddStudentWorkProps) => {
             .insert(
               beginnerData.map(r => ({
                 student_id: student.id,
+                date: today,
                 page_number: parseInt(r.page),
                 line_count: r.lineNumbers.length,
                 line_numbers: r.lineNumbers.join(','),
@@ -214,7 +219,6 @@ const AddStudentWork = ({ student, onClose }: AddStudentWorkProps) => {
           if (beginnerError) throw beginnerError;
 
           // حفظ النقاط العامة والسلوك والملاحظات
-          const today = new Date().toISOString().split('T')[0];
           const { data: existingWork, error: fetchError } = await supabase
             .from('student_daily_work')
             .select('*')
@@ -240,6 +244,7 @@ const AddStudentWork = ({ student, onClose }: AddStudentWorkProps) => {
               .from('student_daily_work')
               .insert({
                 student_id: student.id,
+                date: today,
                 behavior_grade: behavior,
                 general_points: parseInt(generalPoints) || 0,
                 teacher_notes: notes,
@@ -262,6 +267,7 @@ const AddStudentWork = ({ student, onClose }: AddStudentWorkProps) => {
               : `الأسطر ${rec.lineNumbers.join('، ')}`;
             pointsToSave.push({
               student_id: student.id,
+              date: today,
               point_type: 'recitation',
               points: points,
               reason: `تسميع ${linesText} من صفحة ${rec.page}`,
@@ -273,6 +279,7 @@ const AddStudentWork = ({ student, onClose }: AddStudentWorkProps) => {
             const points = getBehaviorPoints(behavior);
             pointsToSave.push({
               student_id: student.id,
+              date: today,
               point_type: 'behavior',
               points: points,
               reason: `تقييم السلوك: ${behavior}`,
@@ -283,6 +290,7 @@ const AddStudentWork = ({ student, onClose }: AddStudentWorkProps) => {
           if (generalPoints) {
             pointsToSave.push({
               student_id: student.id,
+              date: today,
               point_type: 'general',
               points: parseInt(generalPoints),
               reason: 'نقاط إضافية',
@@ -359,7 +367,6 @@ const AddStudentWork = ({ student, onClose }: AddStudentWorkProps) => {
       const reviewPageNumbers = validReviews.map(r => r.part).join(',');
 
       // Check if there's existing work for today
-      const today = new Date().toISOString().split('T')[0];
       const { data: existingWork, error: fetchError } = await supabase
         .from('student_daily_work')
         .select('*')
@@ -401,6 +408,7 @@ const AddStudentWork = ({ student, onClose }: AddStudentWorkProps) => {
           .from('student_daily_work')
           .insert({
             student_id: student.id,
+            date: today,
             new_recitation_pages: validNewRecitations.length,
             new_recitation_grade: validNewRecitations.length > 0 ? validNewRecitations[0].grade : '',
             new_recitation_page_numbers: newPageNumbers,
@@ -426,6 +434,7 @@ const AddStudentWork = ({ student, onClose }: AddStudentWorkProps) => {
           const points = getPointsFromGrade(recitation.grade);
           pointsToSave.push({
             student_id: student.id,
+            date: today,
             point_type: 'recitation',
             points: points,
             reason: `تسميع صفحة ${recitation.page}`,
@@ -440,6 +449,7 @@ const AddStudentWork = ({ student, onClose }: AddStudentWorkProps) => {
           const points = getPointsFromGrade(review.grade);
           pointsToSave.push({
             student_id: student.id,
+            date: today,
             point_type: 'review',
             points: points,
             reason: `مراجعة الجزء ${review.part}`,
@@ -454,6 +464,7 @@ const AddStudentWork = ({ student, onClose }: AddStudentWorkProps) => {
           const points = getPointsFromGrade(hadith.grade);
           pointsToSave.push({
             student_id: student.id,
+            date: today,
             point_type: 'hadith',
             points: points,
             reason: hadith.name,
@@ -466,6 +477,7 @@ const AddStudentWork = ({ student, onClose }: AddStudentWorkProps) => {
         const points = getBehaviorPoints(behavior);
         pointsToSave.push({
           student_id: student.id,
+          date: today,
           point_type: 'behavior',
           points: points,
           reason: `تقييم السلوك: ${behavior}`,
@@ -476,6 +488,7 @@ const AddStudentWork = ({ student, onClose }: AddStudentWorkProps) => {
       if (generalPoints) {
         pointsToSave.push({
           student_id: student.id,
+          date: today,
           point_type: 'general',
           points: parseInt(generalPoints),
           reason: 'نقاط إضافية',
@@ -556,10 +569,29 @@ const AddStudentWork = ({ student, onClose }: AddStudentWorkProps) => {
     return (
       <div className="space-y-4">
         {/* Student Info */}
-        <div className="islamic-card p-4 bg-primary/5 border border-primary/20">
-          <h4 className="text-lg font-bold text-primary mb-2">بيانات الطالب (تمهيدي)</h4>
-          <p className="text-foreground font-semibold">{student.name}</p>
-          <p className="text-sm text-muted-foreground">{student.age} سنة</p>
+        <div className="islamic-card p-4 bg-primary/5 border border-primary/20 flex items-center gap-4">
+          <Avatar className="w-16 h-16 border-2 border-primary/20">
+            <AvatarImage src={student.photo_url} alt={student.name} />
+            <AvatarFallback className="bg-primary/10">
+              <User className="w-8 h-8 text-primary" />
+            </AvatarFallback>
+          </Avatar>
+          <div>
+            <h4 className="text-lg font-bold text-primary mb-1">بيانات الطالب (تمهيدي)</h4>
+            <p className="text-foreground font-semibold">{student.name}</p>
+            <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
+              <span>{student.age} سنة</span>
+              <span className="flex items-center gap-1 text-primary/70">
+                <Calendar className="w-4 h-4" />
+                {new Date(getEffectiveDate()).toLocaleDateString('ar-SA', { 
+                  weekday: 'long', 
+                  year: 'numeric', 
+                  month: 'long', 
+                  day: 'numeric' 
+                })}
+              </span>
+            </div>
+          </div>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -756,10 +788,30 @@ const AddStudentWork = ({ student, onClose }: AddStudentWorkProps) => {
   return (
     <div className="space-y-4">
       {/* Student Info */}
-      <div className="islamic-card p-4 bg-primary/5 border border-primary/20">
-        <h4 className="text-lg font-bold text-primary mb-2">بيانات الطالب</h4>
-        <p className="text-foreground font-semibold">{student.name}</p>
-        <p className="text-sm text-muted-foreground">{student.age} سنة</p>
+      <div className="islamic-card p-4 bg-primary/5 border border-primary/20 flex items-center gap-4">
+        <Avatar className="w-16 h-16 border-2 border-primary/20">
+          <AvatarImage src={student.photo_url} alt={student.name} />
+          <AvatarFallback className="bg-primary/10">
+            <User className="w-8 h-8 text-primary" />
+          </AvatarFallback>
+        </Avatar>
+        <div>
+          <h4 className="text-lg font-bold text-primary mb-1">بيانات الطالب</h4>
+          <p className="text-foreground font-semibold">{student.name}</p>
+          <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
+            <span>{student.age} سنة</span>
+            <span className="flex items-center gap-1 text-primary/70">
+              <Calendar className="w-4 h-4" />
+              {new Date(getEffectiveDate()).toLocaleDateString('ar-SA', { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+              })}
+              {new Date().getHours() < 18 && <span className="text-xs text-muted-foreground hidden sm:inline"> (بيانات الأمس)</span>}
+            </span>
+          </div>
+        </div>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">

@@ -15,6 +15,8 @@ interface StudentMonthlyRecord {
   absenceCount: number;
   lastPage: string;
   examsCount: number;
+  examsInfo: string; // أسماء الاختبارات
+  examsGrades: string; // تقييمات الاختبارات
   retakeCount: number;
   behaviorAverage: string;
   totalPoints: number;
@@ -610,6 +612,8 @@ const StudentRecords = () => {
         absenceCount: 0,
         lastPage: '-',
         examsCount: 0,
+        examsInfo: '',
+        examsGrades: '',
         retakeCount: 0,
         behaviorAverage: '-',
         totalPoints: 0,
@@ -649,7 +653,7 @@ const StudentRecords = () => {
     // جلب الاختبارات
     const { data: examData, error: examError } = await supabase
       .from('student_exams')
-      .select('student_id, grade')
+      .select('student_id, grade, tamhidi_stage, tilawah_section, hifd_section, juz_number, attempt_number')
       .gte('exam_date', startDateStr)
       .lte('exam_date', endDateStr)
       .in('student_id', Array.from(studentRecordsMap.keys()));
@@ -729,11 +733,42 @@ const StudentRecords = () => {
       }
     });
 
-    // معالجة الاختبارات
+    // معالجة الاختبارات (استثناء الإعادات)
+    const studentExamsMap = new Map<string, Array<{name: string, grade: string}>>();
+    
     examData?.forEach(exam => {
+      // استثناء الإعادات
+      if (exam.attempt_number !== 1) return;
+      
       const record = studentRecordsMap.get(exam.student_id);
       if (record) {
         record.examsCount++;
+        
+        // تحديد اسم الاختبار
+        let examName = '';
+        if (exam.tamhidi_stage) examName = exam.tamhidi_stage;
+        else if (exam.tilawah_section) examName = exam.tilawah_section;
+        else if (exam.hifd_section) examName = exam.hifd_section;
+        else if (exam.juz_number) examName = `ج${exam.juz_number}`;
+        else examName = 'اختبار';
+        
+        // حفظ معلومات الاختبار
+        if (!studentExamsMap.has(exam.student_id)) {
+          studentExamsMap.set(exam.student_id, []);
+        }
+        studentExamsMap.get(exam.student_id)?.push({
+          name: examName,
+          grade: exam.grade || '-'
+        });
+      }
+    });
+    
+    // تحويل معلومات الاختبارات إلى نصوص
+    studentExamsMap.forEach((exams, studentId) => {
+      const record = studentRecordsMap.get(studentId);
+      if (record) {
+        record.examsInfo = exams.map(e => e.name).join(', ');
+        record.examsGrades = exams.map(e => e.grade).join(', ');
       }
     });
 
@@ -973,6 +1008,7 @@ const StudentRecords = () => {
                       <TableHead className="text-center font-bold">الغيابات</TableHead>
                       <TableHead className="text-center font-bold">آخر صفحة</TableHead>
                       <TableHead className="text-center font-bold">الاختبارات</TableHead>
+                      <TableHead className="text-center font-bold">التقييمات</TableHead>
                       <TableHead className="text-center font-bold">الإعادات</TableHead>
                       <TableHead className="text-center font-bold">تقييم الأدب</TableHead>
                     </TableRow>
@@ -994,10 +1030,11 @@ const StudentRecords = () => {
                           </span>
                         </TableCell>
                         <TableCell className="text-center text-muted-foreground">{record.lastPage}</TableCell>
-                        <TableCell className="text-center">
-                          <span className="inline-flex items-center justify-center px-3 py-1 rounded-full bg-secondary/10 text-secondary font-semibold">
-                            {record.examsCount}
-                          </span>
+                        <TableCell className="text-center text-sm">
+                          {record.examsInfo || '-'}
+                        </TableCell>
+                        <TableCell className="text-center text-sm">
+                          {record.examsGrades || '-'}
                         </TableCell>
                         <TableCell className="text-center">
                           <span className={`inline-flex items-center justify-center px-3 py-1 rounded-full font-semibold ${

@@ -116,6 +116,7 @@ const TeacherDashboard = () => {
               <p className="text-xl text-muted-foreground mb-6">
                 اختر الصفحة التي تريد الوصول إليها
               </p>
+              
               <IslamicTime />
             </div>
           </div>

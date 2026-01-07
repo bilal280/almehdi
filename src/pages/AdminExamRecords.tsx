@@ -61,6 +61,7 @@ const AdminExamRecords = () => {
   const [circles, setCircles] = useState<Circle[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCircle, setSelectedCircle] = useState<string>("all");
+  const [searchQuery, setSearchQuery] = useState<string>("");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [examToDelete, setExamToDelete] = useState<string | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -220,9 +221,43 @@ const AdminExamRecords = () => {
     return '-';
   };
 
-  const filteredExams = selectedCircle === "all" 
-    ? exams 
-    : exams.filter(exam => exam.circle_id === selectedCircle);
+  const filteredExams = exams.filter(exam => {
+    // فلترة حسب الحلقة
+    const circleMatch = selectedCircle === "all" || exam.circle_id === selectedCircle;
+    
+    // فلترة حسب البحث (الاسم)
+    const searchMatch = !searchQuery || 
+      exam.student_name?.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    return circleMatch && searchMatch;
+  });
+
+  // حساب إحصائيات الشهر الحالي
+  const getMonthlyStats = () => {
+    const now = new Date();
+    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const firstDayStr = firstDayOfMonth.toISOString().split('T')[0];
+
+    // اختبارات الشهر الحالي (استثناء الإعادات)
+    const monthlyExams = exams.filter(exam => 
+      exam.exam_date >= firstDayStr && exam.attempt_number === 1
+    );
+
+    // إحصائيات حسب الحلقة
+    const circleStats = new Map<string, number>();
+    monthlyExams.forEach(exam => {
+      if (exam.circle_id) {
+        circleStats.set(exam.circle_id, (circleStats.get(exam.circle_id) || 0) + 1);
+      }
+    });
+
+    return {
+      totalThisMonth: monthlyExams.length,
+      byCircle: circleStats
+    };
+  };
+
+  const monthlyStats = getMonthlyStats();
 
   const handleExportExams = () => {
     const exportData = filteredExams.map((exam, index) => {
@@ -271,17 +306,72 @@ const AdminExamRecords = () => {
           سجلات الاختبارات
         </h2>
 
+        {/* كاردات الإحصائيات */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          {/* إجمالي اختبارات الشهر */}
+          <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
+            <CardContent className="p-6">
+              <div className="text-center">
+                <p className="text-sm text-blue-600 font-medium mb-2">اختبارات هذا الشهر</p>
+                <p className="text-4xl font-bold text-blue-700">{monthlyStats.totalThisMonth}</p>
+                <p className="text-xs text-blue-500 mt-1">(المحاولة الأولى فقط)</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* اختبارات حسب الحلقة المختارة */}
+          {selectedCircle !== "all" && (
+            <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
+              <CardContent className="p-6">
+                <div className="text-center">
+                  <p className="text-sm text-green-600 font-medium mb-2">
+                    {circles.find(c => c.id === selectedCircle)?.name}
+                  </p>
+                  <p className="text-4xl font-bold text-green-700">
+                    {monthlyStats.byCircle.get(selectedCircle) || 0}
+                  </p>
+                  <p className="text-xs text-green-500 mt-1">اختبار هذا الشهر</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* إجمالي الاختبارات المعروضة */}
+          <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
+            <CardContent className="p-6">
+              <div className="text-center">
+                <p className="text-sm text-purple-600 font-medium mb-2">الاختبارات المعروضة</p>
+                <p className="text-4xl font-bold text-purple-700">{filteredExams.length}</p>
+                <p className="text-xs text-purple-500 mt-1">حسب الفلترة الحالية</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
         <Card>
           <CardHeader>
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center flex-wrap gap-4">
               <CardTitle className="text-right">جميع الاختبارات</CardTitle>
-              <div className="flex gap-4 items-center">
+              <div className="flex gap-4 items-center flex-wrap">
                 {!loading && filteredExams.length > 0 && (
                   <Button onClick={handleExportExams} className="gap-2">
                     <Download className="w-4 h-4" />
                     تصدير إلى Excel
                   </Button>
                 )}
+                
+                {/* حقل البحث */}
+                <div className="w-64">
+                  <Input
+                    type="text"
+                    placeholder="🔍 البحث عن طالب..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="text-right"
+                  />
+                </div>
+                
+                {/* فلترة حسب الحلقة */}
                 <div className="w-64">
                   <Select value={selectedCircle} onValueChange={setSelectedCircle}>
                     <SelectTrigger className="text-right bg-background">
@@ -305,6 +395,7 @@ const AdminExamRecords = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="text-right">#</TableHead>
                     <TableHead className="text-right">التاريخ</TableHead>
                     <TableHead className="text-right">الطالب</TableHead>
                     <TableHead className="text-right">المستوى</TableHead>
@@ -334,8 +425,11 @@ const AdminExamRecords = () => {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredExams.map((exam) => (
+                    filteredExams.map((exam, index) => (
                       <TableRow key={exam.id}>
+                        <TableCell className="text-right font-bold text-primary">
+                          {index + 1}
+                        </TableCell>
                         <TableCell className="text-right">
                           {new Date(exam.exam_date).toLocaleDateString('ar-EG')}
                         </TableCell>

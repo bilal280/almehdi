@@ -6,17 +6,20 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Save, RefreshCw, User, UserCheck, UserX, Plus } from "lucide-react";
 import TeacherNavbar from "@/components/TeacherNavbar";
 import ProtectedTeacherRoute from "@/components/ProtectedTeacherRoute";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { getEffectiveDate } from "@/lib/utils";
 
 interface Student {
   id: string;
   name: string;
   level: string;
+  photo_url?: string;
 }
 
 interface BeginnerRecitation {
@@ -108,7 +111,7 @@ const QuickDataEntry = () => {
 
       const { data, error } = await supabase
         .from('students')
-        .select('id, name, level')
+        .select('id, name, level, photo_url')
         .in('circle_id', circleIds)
         .order('name');
 
@@ -160,20 +163,7 @@ const QuickDataEntry = () => {
   };
 
   // دالة لحساب "اليوم الفعلي" بناءً على الساعة
-  const getEffectiveDate = () => {
-    const now = new Date();
-    const hour = now.getHours();
-    
-    // إذا كانت الساعة قبل 6 مساءً (18:00)، نستخدم تاريخ الأمس
-    if (hour < 18) {
-      const yesterday = new Date(now);
-      yesterday.setDate(yesterday.getDate() - 1);
-      return yesterday.toISOString().split('T')[0];
-    }
-    
-    // إذا كانت الساعة 6 مساءً أو بعدها، نستخدم تاريخ اليوم
-    return now.toISOString().split('T')[0];
-  };
+  // تم نقلها إلى utils.ts
 
   const loadTodayData = async () => {
     setLoadingTodayData(true);
@@ -1093,9 +1083,12 @@ const QuickDataEntry = () => {
                   <Card key={student.id} className="p-4 border-2 hover:border-primary/50 transition-all">
                     <div className="flex items-center justify-between mb-4 pb-3 border-b">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                          <User className="w-5 h-5 text-primary" />
-                        </div>
+                        <Avatar className="w-10 h-10 border border-primary/20">
+                          <AvatarImage src={student.photo_url} alt={student.name} />
+                          <AvatarFallback className="bg-primary/10">
+                            <User className="w-5 h-5 text-primary" />
+                          </AvatarFallback>
+                        </Avatar>
                         <h3 className="text-lg font-bold text-primary">{student.name}</h3>
                       </div>
                       
@@ -1389,10 +1382,20 @@ const QuickDataEntry = () => {
                     {students.map((student) => (
                       <TableRow key={student.id} className="hover:bg-muted/50">
                         <TableCell className="font-semibold">
-                          {student.name}
-                          {student.level === 'تمهيدي' && (
-                            <span className="text-xs text-primary mr-2">(تمهيدي)</span>
-                          )}
+                          <div className="flex items-center gap-3">
+                            <Avatar className="w-9 h-9 border border-primary/20">
+                              <AvatarImage src={student.photo_url} alt={student.name} />
+                              <AvatarFallback className="bg-primary/10">
+                                <User className="w-4 h-4 text-primary" />
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex flex-col">
+                              <span>{student.name}</span>
+                              {student.level === 'تمهيدي' && (
+                                <span className="text-xs text-primary">(تمهيدي)</span>
+                              )}
+                            </div>
+                          </div>
                         </TableCell>
                         
                         {/* خلية الحضور */}
