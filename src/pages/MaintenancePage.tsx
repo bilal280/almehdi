@@ -58,7 +58,7 @@ const MaintenancePage = () => {
         
         <div className="mt-8 text-sm text-gray-500">
           <p>شكراً لتفهمكم وصبركم</p>
-          <p className="mt-2">معهد النور للقرآن الكريم</p>
+          <p className="mt-2">معهد المهدي للقرآن الكريم</p>
         </div>
       </Card>
     </div>

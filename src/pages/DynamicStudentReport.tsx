@@ -421,12 +421,7 @@ const DynamicStudentReport = () => {
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>{error || 'الطالب غير موجود'}</AlertDescription>
           </Alert>
-          <Button asChild variant="outline">
-            <Link to="/">
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              العودة للصفحة الرئيسية
-            </Link>
-          </Button>
+          
         </div>
       </div>
     );
