@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Save, RefreshCw, User, UserCheck, UserX, Plus } from "lucide-react";
+import { Save, RefreshCw, User, UserCheck, UserX, Plus, Eye } from "lucide-react";
 import TeacherNavbar from "@/components/TeacherNavbar";
 import ProtectedTeacherRoute from "@/components/ProtectedTeacherRoute";
 import { supabase } from "@/integrations/supabase/client";
@@ -20,6 +20,7 @@ interface Student {
   name: string;
   level: string;
   photo_url?: string;
+  student_number?: number;
 }
 
 interface BeginnerRecitation {
@@ -111,7 +112,7 @@ const QuickDataEntry = () => {
 
       const { data, error } = await supabase
         .from('students')
-        .select('id, name, level, photo_url')
+        .select('id, name, level, photo_url, student_number')
         .in('circle_id', circleIds)
         .order('name');
 
@@ -820,18 +821,23 @@ const QuickDataEntry = () => {
               .eq('date', today)
               .maybeSingle();
 
-          // حساب عدد الصفحات من أرقام الصفحات
+          // حساب عدد الصفحات من أرقام الصفحات وتخزين التقديرات لكل صفحة
           let totalPages = 0;
           let allPageNumbers: string[] = [];
+          let allPageGrades: string[] = []; // تقدير لكل صفحة
           
           validRecitations.forEach(rec => {
             const pages = rec.pageNumbers.split(',').map(p => p.trim()).filter(p => p);
             totalPages += pages.length;
             allPageNumbers = [...allPageNumbers, ...pages];
+            // إضافة نفس التقدير لكل صفحة في هذا التسميع
+            pages.forEach(() => {
+              allPageGrades.push(rec.grade);
+            });
           });
 
-          const lastGrade = validRecitations.length > 0 ? validRecitations[validRecitations.length - 1].grade : null;
           const pageNumbersString = allPageNumbers.join(',');
+          const pageGradesString = allPageGrades.join(','); // تقديرات مفصولة بفواصل
 
           if (existingWork) {
             // إذا تم تحميل البيانات → استبدال
@@ -840,17 +846,22 @@ const QuickDataEntry = () => {
             
             let finalPages: number;
             let finalPageNumbers: string;
+            let finalPageGrades: string;
             
             if (shouldReplace) {
               // استبدال البيانات
               finalPages = totalPages;
               finalPageNumbers = pageNumbersString;
+              finalPageGrades = pageGradesString;
             } else {
               // إضافة البيانات الجديدة إلى القديمة
               const existingPages = existingWork.new_recitation_page_numbers ? 
                 existingWork.new_recitation_page_numbers.split(',').filter((p: string) => p.trim()) : [];
+              const existingGrades = existingWork.new_recitation_page_grades ?
+                existingWork.new_recitation_page_grades.split(',').filter((g: string) => g.trim()) : [];
               finalPages = (existingWork.new_recitation_pages || 0) + totalPages;
               finalPageNumbers = [...existingPages, ...allPageNumbers].join(',');
+              finalPageGrades = [...existingGrades, ...allPageGrades].join(',');
             }
 
             const newReviewPages = student.level === 'حافظ' && data.reviewPages ? 
@@ -869,7 +880,8 @@ const QuickDataEntry = () => {
               .update({
                 new_recitation_pages: finalPages,
                 new_recitation_page_numbers: finalPageNumbers,
-                new_recitation_grade: lastGrade || existingWork.new_recitation_grade,
+                new_recitation_page_grades: finalPageGrades,
+                new_recitation_grade: allPageGrades[allPageGrades.length - 1] || existingWork.new_recitation_grade,
                 review_pages: finalReviewPages,
                 review_page_numbers: shouldReplace ? reviewPageNumbers : 
                   (reviewPageNumbers ? 
@@ -898,7 +910,8 @@ const QuickDataEntry = () => {
                 date: today,
                 new_recitation_pages: totalPages,
                 new_recitation_page_numbers: pageNumbersString,
-                new_recitation_grade: lastGrade,
+                new_recitation_page_grades: pageGradesString,
+                new_recitation_grade: allPageGrades[allPageGrades.length - 1] || null,
                 review_pages: student.level === 'حافظ' && data.reviewPages ? 
                   data.reviewPages.split(',').filter(p => p.trim()).length : 0,
                 review_page_numbers: reviewPageNumbers,
@@ -1089,10 +1102,21 @@ const QuickDataEntry = () => {
                             <User className="w-5 h-5 text-primary" />
                           </AvatarFallback>
                         </Avatar>
-                        <h3 className="text-lg font-bold text-primary">{student.name}</h3>
+                        <span className="text-lg font-bold text-primary">
+                          {student.name}
+                        </span>
                       </div>
                       
                       <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => window.open(`/student/${student.student_number}`, '_blank')}
+                          className="border-blue-600 text-blue-600 hover:bg-blue-50"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Button>
                         <Button
                           type="button"
                           size="sm"
@@ -1395,6 +1419,15 @@ const QuickDataEntry = () => {
                                 <span className="text-xs text-primary">(تمهيدي)</span>
                               )}
                             </div>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => window.open(`/student/${student.student_number}`, '_blank')}
+                              className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </Button>
                           </div>
                         </TableCell>
                         

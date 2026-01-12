@@ -22,6 +22,7 @@ const AdminNavbar = () => {
     { path: "/admin/attendance", label: "سجل الغياب", icon: UserCheck },
     { path: "/admin/maintenance", label: "وضع الصيانة", icon: Shield },
     { path: "/admin/discontinued-students", label: "الطلاب المنقطعين", icon: Users },
+    { path: "/admin/monthly-summary", label: "المحصلات الشهرية", icon: FileText },
   ];
 
   return (

@@ -58,6 +58,9 @@ const DynamicStudentReport = () => {
   const [allExams, setAllExams] = useState<any[]>([]);
   const [loadingExams, setLoadingExams] = useState(false);
   const [examsDialogOpen, setExamsDialogOpen] = useState(false);
+  const [monthlySummaryImage, setMonthlySummaryImage] = useState<string | null>(null);
+  const [summaryDialogOpen, setSummaryDialogOpen] = useState(false);
+  const [loadingSummary, setLoadingSummary] = useState(false);
 
   useEffect(() => {
     if (studentNumber) {
@@ -334,14 +337,17 @@ const DynamicStudentReport = () => {
           gradeText: rec.grade
         }));
       } else {
-        // للطلاب العاديين: عرض أرقام الصفحات الفعلية
+        // للطلاب العاديين: عرض أرقام الصفحات الفعلية مع تقديراتها
         if (dailyWork && dailyWork.new_recitation_page_numbers) {
           const pageNumbers = dailyWork.new_recitation_page_numbers.split(',');
+          const pageGrades = dailyWork.new_recitation_page_grades ? 
+            dailyWork.new_recitation_page_grades.split(',') : [];
+          
           newRecitations = pageNumbers.map((pageNum: string, i: number) => ({
             id: i + 1,
             pageNumber: parseInt(pageNum.trim()),
-            grade: dailyWork.new_recitation_grade,
-            gradeText: dailyWork.new_recitation_grade
+            grade: pageGrades[i] || dailyWork.new_recitation_grade,
+            gradeText: pageGrades[i] || dailyWork.new_recitation_grade
           }));
         }
         
@@ -819,6 +825,34 @@ const DynamicStudentReport = () => {
     fetchAllExams();
   };
 
+  const fetchMonthlySummary = async () => {
+    if (!studentData?.circleId) return;
+    
+    setLoadingSummary(true);
+    try {
+      const { data, error } = await supabase
+        .from('circle_monthly_summaries')
+        .select('image_url')
+        .eq('circle_id', studentData.circleId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error) throw error;
+      setMonthlySummaryImage(data?.image_url || null);
+    } catch (error) {
+      console.error('Error fetching monthly summary:', error);
+      setMonthlySummaryImage(null);
+    } finally {
+      setLoadingSummary(false);
+    }
+  };
+
+  const handleOpenSummaryDialog = () => {
+    setSummaryDialogOpen(true);
+    fetchMonthlySummary();
+  };
+
   const months = [
     { value: "0", label: "كانون الثاني (1)" },
     { value: "1", label: "شباط (2)" },
@@ -842,11 +876,60 @@ const DynamicStudentReport = () => {
           <div className="container mx-auto px-4 py-4 flex justify-between items-center gap-4">
             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary-foreground/5 to-transparent animate-pulse"></div>
             <div className="flex items-center gap-2 relative z-10">
-              <Sheet>
+              <Sheet open={summaryDialogOpen} onOpenChange={setSummaryDialogOpen}>
+                <SheetTrigger asChild>
+                  <Button 
+                    variant="secondary" 
+                    size="sm" 
+                    onClick={handleOpenSummaryDialog}
+                    className="relative flex items-center gap-2 hover:scale-105 transition-transform duration-300 shadow-lg"
+                  >
+                    <FileText className="w-4 h-4 animate-pulse" />
+                    محصلاتي
+                    <span className="absolute -top-1 -right-1 w-2 h-2 bg-accent rounded-full animate-ping"></span>
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="right" className="w-full sm:max-w-3xl overflow-y-auto">
+                  <SheetHeader>
+                    <SheetTitle className="text-right">المحصلة الشهرية</SheetTitle>
+                  </SheetHeader>
+                  <div className="mt-6">
+                    {loadingSummary ? (
+                      <div className="text-center py-8">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                        <p className="text-muted-foreground mt-4">جاري تحميل المحصلة...</p>
+                      </div>
+                    ) : monthlySummaryImage ? (
+                      <div className="space-y-4">
+                        <img 
+                          src={monthlySummaryImage} 
+                          alt="المحصلة الشهرية"
+                          className="w-full rounded-lg border-2 border-primary/20 shadow-lg"
+                        />
+                        <Button
+                          variant="outline"
+                          className="w-full"
+                          onClick={() => window.open(monthlySummaryImage, '_blank')}
+                        >
+                          عرض بحجم كامل
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="text-center py-8">
+                        <FileText className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+                        <p className="text-muted-foreground">لا توجد محصلة شهرية متاحة حالياً</p>
+                      </div>
+                    )}
+                  </div>
+                </SheetContent>
+              </Sheet>
+
+              {/* المحصلات التفصيلية - معلق للاستخدام المستقبلي */}
+              {/* <Sheet>
                 <SheetTrigger asChild>
                   <Button variant="secondary" size="sm" className="relative flex items-center gap-2 hover:scale-105 transition-transform duration-300 shadow-lg">
                     <FileText className="w-4 h-4 animate-pulse" />
-                    المحصلات
+                    المحصلات التفصيلية
                     <span className="absolute -top-1 -right-1 w-2 h-2 bg-accent rounded-full animate-ping"></span>
                   </Button>
                 </SheetTrigger>
@@ -918,7 +1001,7 @@ const DynamicStudentReport = () => {
                   )}
                 </div>
               </SheetContent>
-            </Sheet>
+            </Sheet> */}
 
             <Sheet open={examsDialogOpen} onOpenChange={setExamsDialogOpen}>
               <SheetTrigger asChild>

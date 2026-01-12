@@ -28,6 +28,7 @@ import MonthlyReview from "./pages/MonthlyReview";
 import DiscontinuedStudents from "./pages/DiscontinuedStudents";
 import MaintenanceControl from "./pages/MaintenanceControl";
 import MaintenancePage from "./pages/MaintenancePage";
+import AdminMonthlySummary from "./pages/AdminMonthlySummary";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -75,6 +76,7 @@ const App = () => (
           <Route path="/admin/exam-records" element={<AdminExamRecords />} />
           <Route path="/admin/maintenance" element={<MaintenanceControl />} />
           <Route path="/admin/discontinued-students" element={<DiscontinuedStudents />} />
+          <Route path="/admin/monthly-summary" element={<AdminMonthlySummary />} />
           
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />

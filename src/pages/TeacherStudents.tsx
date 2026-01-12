@@ -21,6 +21,7 @@ interface Student {
   photo_url?: string;
   circle_id: string;
   level?: string;
+  student_number?: number;
 }
 
 interface AttendanceRecord {
@@ -70,6 +71,7 @@ const TeacherStudents = () => {
           photo_url,
           circle_id,
           level,
+          student_number,
           circles (
             name
           )
@@ -94,7 +96,8 @@ const TeacherStudents = () => {
             age,
             photo_url,
             circle_id,
-            level
+            level,
+            student_number
           )
         `)
         .eq('date', today)
@@ -271,7 +274,14 @@ const TeacherStudents = () => {
                             </span>
                           </div>
                           <div>
-                            <h4 className="font-semibold text-foreground">{student.name}</h4>
+                            <a 
+                              href={`/student/${student.student_number}`}
+                              className="font-semibold text-foreground hover:text-primary hover:underline cursor-pointer"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              {student.name}
+                            </a>
                             <p className="text-xs text-muted-foreground">{student.age} سنة</p>
                           </div>
                         </div>
@@ -323,7 +333,14 @@ const TeacherStudents = () => {
                             </span>
                           </div>
                           <div>
-                            <h4 className="font-semibold text-foreground">{record.student.name}</h4>
+                            <a 
+                              href={`/student/${record.student.student_number}`}
+                              className="font-semibold text-foreground hover:text-primary hover:underline cursor-pointer"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              {record.student.name}
+                            </a>
                             <p className="text-xs text-muted-foreground">{record.student.age} سنة</p>
                           </div>
                         </div>
@@ -378,7 +395,14 @@ const TeacherStudents = () => {
                             </span>
                           </div>
                           <div>
-                            <h4 className="font-semibold text-foreground">{record.student.name}</h4>
+                            <a 
+                              href={`/student/${record.student.student_number}`}
+                              className="font-semibold text-foreground hover:text-primary hover:underline cursor-pointer"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              {record.student.name}
+                            </a>
                             <p className="text-xs text-muted-foreground">{record.student.age} سنة</p>
                           </div>
                         </div>

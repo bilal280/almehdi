@@ -203,6 +203,14 @@ const AdminDashboard = () => {
       path: "/admin/discontinued-students",
       color: "text-red-600",
       bgGradient: "from-red-500/10 to-red-600/10"
+    },
+    {
+      title: "المحصلات الشهرية",
+      description: "رفع صور المحصلات الشهرية للحلقات",
+      icon: FileText,
+      path: "/admin/monthly-summary",
+      color: "text-teal-600",
+      bgGradient: "from-teal-500/10 to-teal-600/10"
     }
   ];
 
