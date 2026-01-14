@@ -1,13 +1,18 @@
 import { useNavigate } from "react-router-dom";
-import { BookOpen, Users, Award, Calendar, LogIn, Facebook, Send, MessageCircle, Phone, Moon, Sun, Sparkles } from "lucide-react";
+import { BookOpen, Users, Award, Calendar, LogIn, Facebook, Send, MessageCircle, Phone, Moon, Sun, Sparkles, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useEffect, useState, useRef } from "react";
 
 const PublicHome = () => {
   const navigate = useNavigate();
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [visibleSections, setVisibleSections] = useState<Set<string>>(new Set());
+  const [showStudentDialog, setShowStudentDialog] = useState(false);
+  const [studentNumber, setStudentNumber] = useState("");
   
   const aboutRef = useRef<HTMLElement>(null);
   const socialRef = useRef<HTMLElement>(null);
@@ -21,11 +26,9 @@ const PublicHome = () => {
       setTheme(savedTheme);
       document.documentElement.classList.toggle("dark", savedTheme === "dark");
     } else {
-      // Check system preference
-      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-      const initialTheme = prefersDark ? "dark" : "light";
-      setTheme(initialTheme);
-      document.documentElement.classList.toggle("dark", prefersDark);
+      // Default to light mode (not system preference)
+      setTheme("light");
+      document.documentElement.classList.remove("dark");
     }
 
     // Intersection Observer for scroll animations
@@ -57,6 +60,15 @@ const PublicHome = () => {
     setTheme(newTheme);
     localStorage.setItem("theme", newTheme);
     document.documentElement.classList.toggle("dark", newTheme === "dark");
+  };
+
+  const handleStudentSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (studentNumber.trim()) {
+      navigate(`/student/${studentNumber.trim()}`);
+      setShowStudentDialog(false);
+      setStudentNumber("");
+    }
   };
 
   return (
@@ -135,12 +147,7 @@ const PublicHome = () => {
             <Button 
               size="lg"
               variant="outline"
-              onClick={() => {
-                const studentNumber = prompt("أدخل رقم الطالب:");
-                if (studentNumber) {
-                  navigate(`/student/${studentNumber}`);
-                }
-              }}
+              onClick={() => setShowStudentDialog(true)}
               className="group w-full sm:w-auto text-base sm:text-lg h-12 sm:h-14 border-2 hover:border-primary hover:bg-primary/5 transition-all duration-300"
             >
               <BookOpen className="w-5 h-5 ml-2 group-hover:scale-110 transition-transform" />
@@ -405,6 +412,64 @@ const PublicHome = () => {
           </p>
         </div>
       </footer>
+
+      {/* Student Number Dialog */}
+      <Dialog open={showStudentDialog} onOpenChange={setShowStudentDialog}>
+        <DialogContent className="sm:max-w-md bg-gradient-to-br from-card to-card/95 backdrop-blur-xl border-2 border-primary/20">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold text-center bg-gradient-to-r from-primary to-primary-light bg-clip-text text-transparent">
+              عرض تقرير الطالب
+            </DialogTitle>
+            <DialogDescription className="text-center text-muted-foreground">
+              أدخل رقم الطالب للوصول إلى تقريره الشامل
+            </DialogDescription>
+          </DialogHeader>
+          
+          <form onSubmit={handleStudentSearch} className="space-y-6 mt-4">
+            <div className="space-y-3">
+              <Label htmlFor="studentNumber" className="text-right block text-foreground font-semibold text-lg">
+                رقم الطالب
+              </Label>
+              <div className="relative">
+                <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
+                <Input
+                  id="studentNumber"
+                  type="text"
+                  value={studentNumber}
+                  onChange={(e) => setStudentNumber(e.target.value)}
+                  className="pr-12 text-right bg-background/50 border-2 border-primary/20 focus:border-primary transition-all h-12 text-lg"
+                  placeholder="مثال: 109"
+                  dir="rtl"
+                  autoFocus
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setShowStudentDialog(false);
+                  setStudentNumber("");
+                }}
+                className="flex-1 h-11 border-2 hover:bg-muted"
+              >
+                <X className="w-4 h-4 ml-2" />
+                إلغاء
+              </Button>
+              <Button
+                type="submit"
+                className="flex-1 h-11 bg-gradient-to-r from-primary to-primary-light hover:from-primary-dark hover:to-primary text-primary-foreground shadow-lg hover:shadow-xl transition-all"
+              >
+                <Search className="w-4 h-4 ml-2" />
+                عرض التقرير
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
