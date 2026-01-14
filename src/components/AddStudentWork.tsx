@@ -39,15 +39,10 @@ const AddStudentWork = ({ student, onClose }: AddStudentWorkProps) => {
   const { toast } = useToast();
 
   const gradeOptions = [
-    { value: "100", label: "ممتاز (100%)" },
-    { value: "95", label: "ممتاز- (95%)" },
-    { value: "90", label: "جيد جداً+ (90%)" },
-    { value: "85", label: "جيد جداً (85%)" },
-    { value: "80", label: "جيد جداً- (80%)" },
-    { value: "75", label: "جيد+ (75%)" },
-    { value: "70", label: "جيد (70%)" },
-    { value: "65", label: "مقبول+ (65%)" },
-    { value: "60", label: "مقبول (60%)" },
+    { value: "ممتاز", label: "ممتاز" },
+    { value: "جيد جداً", label: "جيد جداً" },
+    { value: "جيد", label: "جيد" },
+    { value: "مقبول", label: "مقبول" },
     { value: "إعادة", label: "إعادة" },
   ];
 

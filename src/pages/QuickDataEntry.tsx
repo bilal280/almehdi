@@ -14,6 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { getEffectiveDate } from "@/lib/utils";
+import { manageStudentAttendance } from "@/lib/attendanceManager";
 
 interface Student {
   id: string;
@@ -435,14 +436,12 @@ const QuickDataEntry = () => {
       const teacher = JSON.parse(teacherData);
       const today = getEffectiveDate();
 
-      await supabase
-        .from('student_attendance')
-        .upsert({
-          student_id: studentId,
-          status: status,
-          teacher_id: teacher.id,
-          date: today,
-        });
+      // استخدام الدالة المركزية لإدارة الحضور
+      const result = await manageStudentAttendance(studentId, teacher.id, status, today);
+
+      if (!result.success) {
+        throw new Error(result.message);
+      }
 
       // تحديث الحالة المحلية
       setStudentData(prev => ({
@@ -453,44 +452,15 @@ const QuickDataEntry = () => {
         }
       }));
 
-      // إدارة نقاط الحماسة
-      if (status === 'present') {
-        const { data: existingPoints } = await supabase
-          .from('student_points')
-          .select('*')
-          .eq('student_id', studentId)
-          .eq('date', today)
-          .eq('point_type', 'enthusiasm')
-          .maybeSingle();
-
-        if (!existingPoints) {
-          await supabase
-            .from('student_points')
-            .insert({
-              student_id: studentId,
-              date: today,
-              point_type: 'enthusiasm',
-              points: 1,
-              reason: 'حضور'
-            });
-        }
-      } else if (status === 'absent') {
-        await supabase
-          .from('student_points')
-          .delete()
-          .eq('student_id', studentId)
-          .eq('point_type', 'enthusiasm');
-      }
-
       toast({
         title: "تم بنجاح",
-        description: `تم تسجيل ${status === 'present' ? 'حضور' : 'غياب'}`,
+        description: result.message,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error:', error);
       toast({
         title: "خطأ",
-        description: "فشل في تسجيل الحضور",
+        description: error.message || "فشل في تسجيل الحضور",
         variant: "destructive",
       });
     }

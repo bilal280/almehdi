@@ -11,6 +11,7 @@ import TeacherStudents from "./pages/TeacherStudents";
 import TeacherExamRecords from "./pages/TeacherExamRecords";
 
 import Login from "./pages/Login";
+import PublicHome from "./pages/PublicHome";
 import CircleActivities from "./pages/CircleActivities";
 import StudentRecords from "./pages/StudentRecords";
 import AdminLogin from "./pages/AdminLogin";
@@ -40,7 +41,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Login />} />
+          <Route path="/" element={<PublicHome />} />
           <Route path="/login" element={<Login />} />
           
           {/* صفحة الصيانة */}

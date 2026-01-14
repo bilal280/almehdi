@@ -13,6 +13,7 @@ import EditTodayWork from "@/components/EditTodayWork";
 import AttendanceEditor from "@/components/AttendanceEditor";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { manageStudentAttendance } from "@/lib/attendanceManager";
 
 interface Student {
   id: string;
@@ -140,28 +141,12 @@ const TeacherStudents = () => {
       
       const teacher = JSON.parse(teacherData);
       const today = new Date().toISOString().split('T')[0];
-      const existingRecord = attendance.find(record => record.student_id === student.id);
 
-      if (existingRecord) {
-        // تحديث السجل الموجود
-        const { error } = await supabase
-          .from('student_attendance')
-          .update({ status })
-          .eq('id', existingRecord.id);
+      // استخدام الدالة المركزية لإدارة الحضور
+      const result = await manageStudentAttendance(student.id, teacher.id, status, today);
 
-        if (error) throw error;
-      } else {
-        // إنشاء سجل جديد
-        const { error } = await supabase
-          .from('student_attendance')
-          .insert({
-            student_id: student.id,
-            status,
-            teacher_id: teacher.id,
-            date: today,
-          });
-
-        if (error) throw error;
+      if (!result.success) {
+        throw new Error(result.message);
       }
 
       // تحديث البيانات
@@ -169,18 +154,18 @@ const TeacherStudents = () => {
       
       toast({
         title: "تم بنجاح",
-        description: `تم تسجيل ${status === 'present' ? 'حضور' : 'غياب'} ${student.name}`,
+        description: result.message,
       });
 
       if (status === 'present') {
         setSelectedStudent(student);
         setIsDialogOpen(true);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating attendance:', error);
       toast({
         title: "خطأ",
-        description: "فشل في تحديث الحضور",
+        description: error.message || "فشل في تحديث الحضور",
         variant: "destructive",
       });
     }

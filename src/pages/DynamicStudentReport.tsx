@@ -514,8 +514,15 @@ const DynamicStudentReport = () => {
               </AlertDescription>
             </Alert>
             
+            <Alert className="bg-orange-50 border-orange-200 mt-4">
+              <AlertCircle className="h-4 w-4 text-orange-600" />
+              <AlertDescription className="text-center text-orange-700">
+                <p className="font-semibold">⚠️ تم حذف جميع نقاط الحماسة التراكمية بسبب الغياب</p>
+              </AlertDescription>
+            </Alert>
+            
             <PointsSection 
-              enthusiasmPoints={studentData.enthusiasmPoints}
+              enthusiasmPoints={0}
               generalPoints={studentData.generalPoints}
             />
           </div>
