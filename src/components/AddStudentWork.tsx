@@ -357,8 +357,9 @@ const AddStudentWork = ({ student, onClose }: AddStudentWorkProps) => {
       const validReviews = reviews.filter(r => r.part && r.grade);
       const totalHadiths = hadiths.filter(h => h.name && h.grade).length;
       
-      // تجميع أرقام الصفحات كنص مفصول بفواصل
+      // تجميع أرقام الصفحات وتقديراتها كنص مفصول بفواصل
       const newPageNumbers = validNewRecitations.map(r => r.page).join(',');
+      const newPageGrades = validNewRecitations.map(r => r.grade).join(',');
       const reviewPageNumbers = validReviews.map(r => r.part).join(',');
 
       // Check if there's existing work for today
@@ -372,19 +373,22 @@ const AddStudentWork = ({ student, onClose }: AddStudentWorkProps) => {
       if (fetchError) throw fetchError;
 
       if (existingWork) {
-        // Update existing record by adding page numbers
+        // Update existing record by adding page numbers and grades
         const existingNewPages = existingWork.new_recitation_page_numbers ? existingWork.new_recitation_page_numbers.split(',') : [];
+        const existingNewGrades = existingWork.new_recitation_page_grades ? existingWork.new_recitation_page_grades.split(',') : [];
         const existingReviewPages = existingWork.review_page_numbers ? existingWork.review_page_numbers.split(',') : [];
         
         const updatedNewPages = newPageNumbers ? [...existingNewPages, ...newPageNumbers.split(',')].join(',') : existingNewPages.join(',');
+        const updatedNewGrades = newPageGrades ? [...existingNewGrades, ...newPageGrades.split(',')].join(',') : existingNewGrades.join(',');
         const updatedReviewPages = reviewPageNumbers ? [...existingReviewPages, ...reviewPageNumbers.split(',')].join(',') : existingReviewPages.join(',');
         
         const { error: workError } = await supabase
           .from('student_daily_work')
           .update({
             new_recitation_pages: (existingWork.new_recitation_pages || 0) + validNewRecitations.length,
-            new_recitation_grade: validNewRecitations.length > 0 ? validNewRecitations[0].grade : existingWork.new_recitation_grade,
+            new_recitation_grade: validNewRecitations.length > 0 ? validNewRecitations[validNewRecitations.length - 1].grade : existingWork.new_recitation_grade,
             new_recitation_page_numbers: updatedNewPages,
+            new_recitation_page_grades: updatedNewGrades,
             review_pages: (existingWork.review_pages || 0) + validReviews.length,
             review_grade: validReviews.length > 0 ? validReviews[0].grade : existingWork.review_grade,
             review_page_numbers: updatedReviewPages,
@@ -405,8 +409,9 @@ const AddStudentWork = ({ student, onClose }: AddStudentWorkProps) => {
             student_id: student.id,
             date: today,
             new_recitation_pages: validNewRecitations.length,
-            new_recitation_grade: validNewRecitations.length > 0 ? validNewRecitations[0].grade : '',
+            new_recitation_grade: validNewRecitations.length > 0 ? validNewRecitations[validNewRecitations.length - 1].grade : '',
             new_recitation_page_numbers: newPageNumbers,
+            new_recitation_page_grades: newPageGrades,
             review_pages: validReviews.length,
             review_grade: validReviews.length > 0 ? validReviews[0].grade : '',
             review_page_numbers: reviewPageNumbers,

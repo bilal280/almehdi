@@ -367,10 +367,10 @@ const StudentRecords = () => {
       }
     });
 
-    // معالجة الاختبارات
+    // معالجة الاختبارات (استثناء الإعادات)
     examData?.forEach(exam => {
       const summary = studentMap.get(exam.student_id);
-      if (summary) {
+      if (summary && exam.grade !== 'إعادة') {
         summary.examsCount++;
       }
     });
@@ -542,10 +542,10 @@ const StudentRecords = () => {
       }
     });
 
-    // إضافة عدد الاختبارات
+    // إضافة عدد الاختبارات (استثناء الإعادات)
     examData?.forEach(exam => {
       const summary = studentMap.get(exam.student_id);
-      if (summary) {
+      if (summary && exam.grade !== 'إعادة') {
         summary.examsCount += 1;
       }
     });
@@ -737,8 +737,8 @@ const StudentRecords = () => {
     const studentExamsMap = new Map<string, Array<{name: string, grade: string}>>();
     
     examData?.forEach(exam => {
-      // استثناء الإعادات
-      if (exam.attempt_number !== 1) return;
+      // استثناء الإعادات (بناءً على المحاولة أو التقدير)
+      if (exam.attempt_number !== 1 || exam.grade === 'إعادة') return;
       
       const record = studentRecordsMap.get(exam.student_id);
       if (record) {

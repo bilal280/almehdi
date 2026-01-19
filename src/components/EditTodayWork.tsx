@@ -176,11 +176,17 @@ const EditTodayWork = ({ students }: EditTodayWorkProps) => {
           ? formData.review_page_numbers.split(',').filter(p => p.trim()).length 
           : parseInt(formData.review_pages) || 0;
 
+        // إنشاء تقديرات لكل صفحة (نفس التقدير لجميع الصفحات عند التعديل)
+        const pageGrades = formData.new_recitation_page_numbers && formData.new_recitation_grade
+          ? formData.new_recitation_page_numbers.split(',').map(() => formData.new_recitation_grade).join(',')
+          : null;
+
         const { error } = await supabase
           .from('student_daily_work')
           .update({
             new_recitation_pages: newRecitationCount,
             new_recitation_page_numbers: formData.new_recitation_page_numbers || null,
+            new_recitation_page_grades: pageGrades,
             new_recitation_grade: formData.new_recitation_grade,
             review_pages: reviewCount,
             review_page_numbers: formData.review_page_numbers || null,

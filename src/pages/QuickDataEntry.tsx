@@ -63,35 +63,9 @@ const QuickDataEntry = () => {
     if (Object.keys(studentData).length > 0) {
       const today = getEffectiveDate();
       localStorage.setItem(`quickEntry_${today}`, JSON.stringify(studentData));
+      console.log('✅ تم حفظ البيانات تلقائياً في LocalStorage');
     }
   }, [studentData]);
-
-  // استرجاع البيانات من LocalStorage عند التحميل
-  useEffect(() => {
-    const today = getEffectiveDate();
-    const savedData = localStorage.getItem(`quickEntry_${today}`);
-    if (savedData && Object.keys(studentData).length > 0) {
-      try {
-        const parsed = JSON.parse(savedData);
-        // دمج البيانات المحفوظة مع البيانات الحالية
-        setStudentData(prev => {
-          const merged = { ...prev };
-          Object.keys(parsed).forEach(key => {
-            if (merged[key]) {
-              merged[key] = { ...merged[key], ...parsed[key] };
-            }
-          });
-          return merged;
-        });
-        toast({
-          title: "تم استرجاع البيانات",
-          description: "تم استرجاع البيانات المحفوظة مسبقاً",
-        });
-      } catch (error) {
-        console.error('Error parsing saved data:', error);
-      }
-    }
-  }, [students]);
 
   useEffect(() => {
     fetchStudents();
@@ -139,19 +113,50 @@ const QuickDataEntry = () => {
 
       const attendanceMap = new Map(attendanceData?.map(a => [a.student_id, a.status]) || []);
 
-      const initialData: Record<string, StudentData> = {};
+      // التحقق من وجود بيانات محفوظة قبل التهيئة
+      const savedData = localStorage.getItem(`quickEntry_${today}`);
+      let initialData: Record<string, StudentData> = {};
+
+      if (savedData) {
+        try {
+          const parsed = JSON.parse(savedData);
+          // استخدام البيانات المحفوظة إذا وجدت
+          initialData = parsed;
+          console.log('✅ استخدام البيانات المحفوظة من LocalStorage');
+        } catch (error) {
+          console.error('Error parsing saved data:', error);
+          localStorage.removeItem(`quickEntry_${today}`);
+        }
+      }
+
+      // إضافة الطلاب الجدد أو المفقودين
       activeStudents.forEach(student => {
-        initialData[student.id] = {
-          regularRecitations: [{ pageNumbers: '', grade: '' }],
-          reviewPages: '',
-          reviewGrade: '',
-          behaviorGrade: '',
-          notes: '',
-          beginnerRecitations: [{ pageNumber: '', selectedLines: [], grade: '' }],
-          attendance: attendanceMap.get(student.id) as 'present' | 'absent' | null || null
-        };
+        if (!initialData[student.id]) {
+          initialData[student.id] = {
+            regularRecitations: [{ pageNumbers: '', grade: '' }],
+            reviewPages: '',
+            reviewGrade: '',
+            behaviorGrade: '',
+            notes: '',
+            beginnerRecitations: [{ pageNumber: '', selectedLines: [], grade: '' }],
+            attendance: attendanceMap.get(student.id) as 'present' | 'absent' | null || null
+          };
+        } else {
+          // تحديث حالة الحضور من قاعدة البيانات
+          initialData[student.id].attendance = attendanceMap.get(student.id) as 'present' | 'absent' | null || initialData[student.id].attendance;
+        }
       });
+
       setStudentData(initialData);
+      
+      // إظهار رسالة إذا كانت هناك بيانات محفوظة
+      if (savedData) {
+        toast({
+          title: "📥 تم استرجاع البيانات",
+          description: "تم استرجاع البيانات المحفوظة مسبقاً. يمكنك المتابعة من حيث توقفت.",
+          duration: 5000,
+        });
+      }
     } catch (error) {
       console.error('Error:', error);
       toast({
@@ -464,6 +469,31 @@ const QuickDataEntry = () => {
         variant: "destructive",
       });
     }
+  };
+
+  const clearSavedData = () => {
+    const today = getEffectiveDate();
+    localStorage.removeItem(`quickEntry_${today}`);
+    
+    // إعادة تعيين البيانات
+    const resetData: Record<string, StudentData> = {};
+    students.forEach(student => {
+      resetData[student.id] = {
+        regularRecitations: [{ pageNumbers: '', grade: '' }],
+        reviewPages: '',
+        reviewGrade: '',
+        behaviorGrade: '',
+        notes: '',
+        beginnerRecitations: [{ pageNumber: '', selectedLines: [], grade: '' }],
+        attendance: null
+      };
+    });
+    setStudentData(resetData);
+    
+    toast({
+      title: "تم المسح",
+      description: "تم مسح جميع البيانات المحفوظة",
+    });
   };
 
   const handleSave = async () => {
@@ -1044,9 +1074,14 @@ const QuickDataEntry = () => {
                   <RefreshCw className={`w-4 h-4 ml-2 ${loadingTodayData ? 'animate-spin' : ''}`} />
                   {loadingTodayData ? 'جاري التحميل...' : 'تحميل بيانات اليوم'}
                 </Button>
-                <Button onClick={fetchStudents} variant="outline" disabled={loading}>
-                  <RefreshCw className={`w-4 h-4 ml-2 ${loading ? 'animate-spin' : ''}`} />
-                  إعادة تعيين
+                <Button 
+                  onClick={clearSavedData} 
+                  variant="destructive" 
+                  disabled={loading}
+                  className="bg-orange-600 hover:bg-orange-700"
+                >
+                  <RefreshCw className="w-4 h-4 ml-2" />
+                  مسح البيانات المحفوظة
                 </Button>
                 <Button onClick={handleSave} disabled={saving} size="lg">
                   <Save className="w-4 h-4 ml-2" />
@@ -1054,6 +1089,27 @@ const QuickDataEntry = () => {
                 </Button>
               </div>
             </div>
+
+            {/* إشعار بوجود بيانات محفوظة */}
+            {(() => {
+              const today = getEffectiveDate();
+              const savedData = localStorage.getItem(`quickEntry_${today}`);
+              return savedData ? (
+                <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-4 mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-blue-500 text-white rounded-full p-2">
+                      <Save className="w-5 h-5" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-semibold text-blue-900">💾 يتم الحفظ التلقائي</p>
+                      <p className="text-sm text-blue-700">
+                        بياناتك محفوظة تلقائياً. حتى لو أغلقت الصفحة أو حدث Refresh، ستجد بياناتك هنا.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : null;
+            })()}
 
             {loading ? (
               <div className="text-center py-12">

@@ -255,7 +255,7 @@ const AdminStudentRecords = () => {
 
     examData?.forEach(exam => {
       const summary = studentMap.get(exam.student_id);
-      if (summary) {
+      if (summary && exam.grade !== 'إعادة') {
         summary.examsCount++;
       }
     });
@@ -517,10 +517,10 @@ const AdminStudentRecords = () => {
           }
         });
 
-        // إضافة عدد الاختبارات
+        // إضافة عدد الاختبارات (استثناء الإعادات)
         examData?.forEach(exam => {
           const summary = studentMap.get(exam.student_id);
-          if (summary) {
+          if (summary && exam.grade !== 'إعادة') {
             summary.examsCount += 1;
           }
         });
@@ -812,8 +812,12 @@ const AdminStudentRecords = () => {
       // الغيابات
       const absenceCount = attendanceData?.filter(a => a.student_id === studentId).length || 0;
 
-      // الاختبارات (استثناء الإعادات)
-      const studentExams = examsData?.filter(e => e.student_id === studentId && e.attempt_number === 1) || [];
+      // الاختبارات (استثناء الإعادات بناءً على المحاولة والتقدير)
+      const studentExams = examsData?.filter(e => 
+        e.student_id === studentId && 
+        e.attempt_number === 1 && 
+        e.grade !== 'إعادة'
+      ) || [];
       const examsCount = studentExams.length;
       const retakeCount = examsData?.filter(e => e.student_id === studentId && e.attempt_number > 1).length || 0;
       

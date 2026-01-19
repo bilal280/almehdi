@@ -945,18 +945,25 @@ const DynamicStudentReport = () => {
                     <SheetTitle>المحصلات الشهرية والفصلية</SheetTitle>
                   </SheetHeader>
                 <div className="mt-6 space-y-6">
-                  <Tabs value={selectedView} onValueChange={(v) => setSelectedView(v as 'monthly' | 'quarterly')}>
+                  <Tabs 
+                    value={selectedView} 
+                    onValueChange={(v) => setSelectedView(v as 'monthly' | 'quarterly')}
+                  >
                     <TabsList className="grid w-full grid-cols-2">
-                      <TabsTrigger value="monthly">شهري</TabsTrigger>
-                      <TabsTrigger value="quarterly">فصلي (4 أشهر)</TabsTrigger>
+                      <TabsTrigger value="monthly" disabled={loadingRecords}>شهري</TabsTrigger>
+                      <TabsTrigger value="quarterly" disabled={loadingRecords}>فصلي (4 أشهر)</TabsTrigger>
                     </TabsList>
                   </Tabs>
 
-                  <Select value={selectedMonth} onValueChange={(value) => {
-                    setSelectedMonth(value);
-                    setTimeout(() => fetchRecords(), 100);
-                  }}>
-                    <SelectTrigger>
+                  <Select 
+                    value={selectedMonth} 
+                    onValueChange={(value) => {
+                      setSelectedMonth(value);
+                      setTimeout(() => fetchRecords(), 100);
+                    }}
+                    disabled={loadingRecords}
+                  >
+                    <SelectTrigger disabled={loadingRecords}>
                       <SelectValue placeholder="اختر الشهر" />
                     </SelectTrigger>
                     <SelectContent>
@@ -969,8 +976,12 @@ const DynamicStudentReport = () => {
                   </Select>
 
                   {loadingRecords ? (
-                    <div className="text-center py-8">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                    <div className="text-center py-12">
+                      <div className="flex flex-col items-center gap-4">
+                        <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent"></div>
+                        <p className="text-primary font-semibold text-lg">جاري حساب البيانات...</p>
+                        <p className="text-muted-foreground text-sm">يرجى الانتظار، قد يستغرق هذا بضع ثوانٍ</p>
+                      </div>
                     </div>
                   ) : records.length > 0 ? (
                     <Table>

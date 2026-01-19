@@ -79,11 +79,22 @@ const ExamManagement = () => {
   const [tajweedScore, setTajweedScore] = useState("");
 
   // دالة لحساب التقدير تلقائياً بناءً على العلامة ومستوى الطالب
-  const calculateGrade = (score: number, level: string): string => {
+  const calculateGrade = (score: number, level: string, examStage?: string): string => {
     if (!score || score < 0 || score > 100) return "";
 
     if (level === "تمهيدي") {
-      // سلم التمهيدي
+      // سلم التمهيدي الكامل (حد النجاح من 85)
+      if (examStage === "مرحلة كامل") {
+        if (score === 100) return "شرف";
+        if (score >= 97) return "تفوق";
+        if (score >= 94) return "ممتاز";
+        if (score >= 90) return "جيد جداً";
+        if (score >= 87) return "جيد";
+        if (score >= 85) return "مقبول";
+        return "إعادة";
+      }
+      
+      // سلم التمهيدي العادي
       if (score === 100) return "شرف";
       if (score >= 98) return "تفوق";
       if (score >= 96) return "ممتاز";
@@ -94,7 +105,7 @@ const ExamManagement = () => {
 
       return "إعادة";
     } else if (level === "حافظ") {
-      // سلم  (الحافظ)
+      // سلم الحافظ
       if (score === 100) return "شرف";
       if (score >= 97) return "تفوق";
       if (score >= 94) return "ممتاز";
@@ -105,7 +116,7 @@ const ExamManagement = () => {
 
       return "إعادة";
     } else {
-      // سلم التلاوة )
+      // سلم التلاوة
       if (score === 100) return "شرف";
       if (score >= 98 ) return "تفوق";
       if (score >= 95) return "ممتاز";
@@ -118,16 +129,6 @@ const ExamManagement = () => {
     }
   };
 
-  // تحديث التقدير تلقائياً عند تغيير العلامة
-  useEffect(() => {
-    if (examScore && selectedStudentLevel) {
-      const score = parseFloat(examScore);
-      const calculatedGrade = calculateGrade(score, selectedStudentLevel);
-      setGrade(calculatedGrade);
-    } else {
-      setGrade("");
-    }
-  }, [examScore, selectedStudentLevel]);
   const [surahMemoryScore, setSurahMemoryScore] = useState("");
   const [notes, setNotes] = useState("");
   
@@ -147,6 +148,17 @@ const ExamManagement = () => {
   // حالات تبويب سجلات الاختبارات
   const [activeTab, setActiveTab] = useState("new");
   const [previousExams, setPreviousExams] = useState<Exam[]>([]);
+
+  // تحديث التقدير تلقائياً عند تغيير العلامة
+  useEffect(() => {
+    if (examScore && selectedStudentLevel) {
+      const score = parseFloat(examScore);
+      const calculatedGrade = calculateGrade(score, selectedStudentLevel, tamhidiStage);
+      setGrade(calculatedGrade);
+    } else {
+      setGrade("");
+    }
+  }, [examScore, selectedStudentLevel, tamhidiStage]);
   const [loadingExams, setLoadingExams] = useState(false);
   const [filterCircleId, setFilterCircleId] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
