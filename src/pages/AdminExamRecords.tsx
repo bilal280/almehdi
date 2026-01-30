@@ -45,6 +45,7 @@ interface Exam {
   tamhidi_stage: string | null;
   tilawah_section: string | null;
   hifd_section: string | null;
+  teacher_name: string | null;
   student_name?: string;
   student_level?: string;
   circle_name?: string;
@@ -267,6 +268,7 @@ const AdminExamRecords = () => {
         'اسم الطالب': exam.student_name,
         'المستوى': exam.student_level,
         'الحلقة': exam.circle_name,
+        'الأستاذ': exam.teacher_name || 'غير محدد',
         'القسم/المرحلة': getExamSection(exam),
         'المحاولة': exam.attempt_number,
         'العلامة': exam.exam_score !== null ? exam.exam_score : '-',
@@ -400,6 +402,7 @@ const AdminExamRecords = () => {
                     <TableHead className="text-right">الطالب</TableHead>
                     <TableHead className="text-right">المستوى</TableHead>
                     <TableHead className="text-right">الحلقة</TableHead>
+                    <TableHead className="text-right">الأستاذ</TableHead>
                     <TableHead className="text-right">القسم/المرحلة</TableHead>
                     <TableHead className="text-right">المحاولة</TableHead>
                     <TableHead className="text-right">العلامة</TableHead>
@@ -414,13 +417,13 @@ const AdminExamRecords = () => {
                 <TableBody>
                   {loading ? (
                     <TableRow>
-                      <TableCell colSpan={13} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={15} className="text-center py-8 text-muted-foreground">
                         جاري تحميل السجلات...
                       </TableCell>
                     </TableRow>
                   ) : filteredExams.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={13} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={15} className="text-center py-8 text-muted-foreground">
                         لا توجد سجلات اختبارات
                       </TableCell>
                     </TableRow>
@@ -442,6 +445,11 @@ const AdminExamRecords = () => {
                           </span>
                         </TableCell>
                         <TableCell className="text-right">{exam.circle_name}</TableCell>
+                        <TableCell className="text-right">
+                          <span className="px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                            {exam.teacher_name || 'غير محدد'}
+                          </span>
+                        </TableCell>
                         <TableCell className="text-right font-medium">
                           {getExamSection(exam)}
                         </TableCell>

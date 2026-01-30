@@ -435,6 +435,11 @@ const ExamManagement = () => {
 
     setLoading(true);
     try {
+      // الحصول على اسم المدرس الحالي من localStorage
+      const teacherData = localStorage.getItem('teacher');
+      const teacher = teacherData ? JSON.parse(teacherData) : null;
+      const teacherName = teacher?.name || null;
+
       const insertData: any = {
         student_id: selectedStudentId,
         circle_id: selectedCircleId,
@@ -444,7 +449,8 @@ const ExamManagement = () => {
         tajweed_score: tajweedScore ? parseFloat(tajweedScore) : null,
         surah_memory_score: surahMemoryScore ? parseFloat(surahMemoryScore) : null,
         notes: notes || null,
-        exam_date: examDate
+        exam_date: examDate,
+        teacher_name: teacherName // حفظ اسم المدرس
       };
 
       // إضافة الحقول حسب مستوى الطالب

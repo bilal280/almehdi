@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import AdminNavbar from "@/components/AdminNavbar";
+import RewardsSection from "@/components/RewardsSection";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -164,7 +165,11 @@ const AdminPointsRecords = () => {
           سجلات النقاط
         </h2>
 
-        <Card>
+        {/* قسم المكافآت - في الأعلى */}
+        <RewardsSection />
+
+        {/* قسم جميع الطلاب - في الأسفل */}
+        <Card className="mt-8">
           <CardHeader>
             <div className="flex justify-between items-center flex-wrap gap-4">
               <CardTitle className="text-right flex items-center gap-3">
