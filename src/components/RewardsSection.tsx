@@ -62,10 +62,10 @@ const RewardsSection = () => {
         .eq('point_type', 'enthusiasm')
         .in('student_id', activeStudents.map(s => s.id));
 
-      // جلب المكافآت المُعطاة
+      // جلب المكافآت المُعطاة مع النقاط التي كانت عندها
       const { data: rewardsData } = await supabase
         .from('student_rewards')
-        .select('student_id, reward_level')
+        .select('student_id, reward_level, enthusiasm_points_at_reward')
         .in('student_id', activeStudents.map(s => s.id));
 
       // حساب النقاط والمكافآت لكل طالب
@@ -80,11 +80,18 @@ const RewardsSection = () => {
         const lastMilestone = Math.floor(totalPoints / 5) * 5; // مثلاً: 14 → 10، 17 → 15
         
         if (lastMilestone >= 5) {
-          const eligibleRewards = lastMilestone / 5; // عدد المكافآت المستحقة
-          const givenRewards = rewardsData?.filter(r => r.student_id === student.id).length || 0;
+          const studentRewards = rewardsData?.filter(r => r.student_id === student.id) || [];
+          const givenRewards = studentRewards.length;
           
-          // فقط إذا لم يتم إعطاء المكافأة بعد
-          if (givenRewards < eligibleRewards) {
+          // التحقق من أن آخر مكافأة لم تكن عند نفس الـ milestone الحالي
+          const lastRewardMilestone = studentRewards.length > 0 
+            ? Math.max(...studentRewards.map(r => r.enthusiasm_points_at_reward || 0))
+            : 0;
+          
+          // فقط إذا لم يتم إعطاء المكافأة عند هذا الـ milestone
+          if (lastMilestone > lastRewardMilestone) {
+            const eligibleRewards = lastMilestone / 5;
+            
             studentsMap.set(student.id, {
               id: student.id,
               name: student.name,
