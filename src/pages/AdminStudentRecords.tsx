@@ -88,34 +88,63 @@ const AdminStudentRecords = () => {
   }, [selectedView, selectedCircle, selectedMonth, selectedYear]);
 
   const fetchMonthWeeksRecords = async (month: number, year: number) => {
-    // تقسيم الشهر إلى أسابيع
+    // تقسيم الشهر إلى أسابيع بناءً على أسبوع العمل (السبت - الأربعاء)
+    // فقط من أيام الشهر نفسه، بدون استعارة أيام من أشهر أخرى
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
     
     const weeks: {weekNumber: number, weekLabel: string, startDate: Date, endDate: Date}[] = [];
     let weekNumber = 1;
+    
+    // البدء من أول يوم في الشهر
     let currentDate = new Date(firstDay);
     
+    // البحث عن أول سبت في الشهر
     while (currentDate <= lastDay) {
-      const weekStart = new Date(currentDate);
-      const weekEnd = new Date(currentDate);
-      weekEnd.setDate(weekEnd.getDate() + 6);
+      const dayOfWeek = currentDate.getDay(); // 0 = الأحد, 6 = السبت
       
-      if (weekEnd > lastDay) {
-        weekEnd.setTime(lastDay.getTime());
+      // إذا وصلنا للسبت أو كنا في أول يوم من الشهر
+      if (dayOfWeek === 6 || currentDate.getTime() === firstDay.getTime()) {
+        const weekStart = new Date(currentDate);
+        
+        // حساب نهاية الأسبوع (الأربعاء) أو آخر يوم في الشهر
+        const weekEnd = new Date(currentDate);
+        
+        // إذا كان اليوم الحالي سبت، نضيف 4 أيام للوصول للأربعاء
+        if (dayOfWeek === 6) {
+          weekEnd.setDate(weekEnd.getDate() + 4);
+        } else {
+          // إذا بدأنا من منتصف الأسبوع، نبحث عن الأربعاء القادم
+          while (weekEnd.getDay() !== 3 && weekEnd <= lastDay) {
+            weekEnd.setDate(weekEnd.getDate() + 1);
+          }
+        }
+        
+        // التأكد من عدم تجاوز آخر يوم في الشهر
+        const effectiveEnd = weekEnd > lastDay ? lastDay : weekEnd;
+        
+        const weekLabel = `الأسبوع ${weekNumber} (${weekStart.getDate()}/${month + 1} - ${effectiveEnd.getDate()}/${month + 1})`;
+        
+        weeks.push({
+          weekNumber,
+          weekLabel,
+          startDate: weekStart,
+          endDate: effectiveEnd
+        });
+        
+        weekNumber++;
+        
+        // الانتقال لليوم التالي بعد نهاية الأسبوع
+        currentDate = new Date(effectiveEnd);
+        currentDate.setDate(currentDate.getDate() + 1);
+        
+        // تخطي الخميس والجمعة (أيام العطلة)
+        while (currentDate <= lastDay && (currentDate.getDay() === 4 || currentDate.getDay() === 5)) {
+          currentDate.setDate(currentDate.getDate() + 1);
+        }
+      } else {
+        currentDate.setDate(currentDate.getDate() + 1);
       }
-      
-      const weekLabel = `الأسبوع ${weekNumber} (${weekStart.getDate()}/${month + 1} - ${weekEnd.getDate()}/${month + 1})`;
-      
-      weeks.push({
-        weekNumber,
-        weekLabel,
-        startDate: weekStart,
-        endDate: weekEnd
-      });
-      
-      currentDate.setDate(currentDate.getDate() + 7);
-      weekNumber++;
     }
     
     // جلب السجلات لكل أسبوع
@@ -212,7 +241,7 @@ const AdminStudentRecords = () => {
       .in('student_id', Array.from(studentMap.keys()));
 
     // معالجة البيانات
-    const studentLastPages = new Map<string, string>();
+    const studentLastPages = new Map<string, {page: string, date: string}>();
     
     workData?.forEach(work => {
       const summary = studentMap.get(work.student_id);
@@ -465,7 +494,7 @@ const AdminStudentRecords = () => {
         if (examError) throw examError;
 
         // معالجة البيانات
-        const studentLastPages = new Map<string, string>();
+        const studentLastPages = new Map<string, {page: string, date: string}>();
         
         // إضافة بيانات الأعمال اليومية (استثناء الإعادات)
         workData?.forEach(work => {
@@ -475,11 +504,17 @@ const AdminStudentRecords = () => {
             if (work.new_recitation_grade !== 'إعادة') {
               summary.totalPages += work.new_recitation_pages || 0;
               
-              // تتبع آخر صفحة
+              // تتبع آخر صفحة مع التاريخ
               if (work.new_recitation_page_numbers) {
                 const pageNumbers = work.new_recitation_page_numbers.split(',').map((p: string) => p.trim()).filter((p: string) => p);
                 if (pageNumbers.length > 0) {
-                  studentLastPages.set(work.student_id, pageNumbers[pageNumbers.length - 1]);
+                  const currentLastPage = studentLastPages.get(work.student_id);
+                  if (!currentLastPage || new Date(work.date) >= new Date(currentLastPage.date)) {
+                    studentLastPages.set(work.student_id, {
+                      page: pageNumbers[pageNumbers.length - 1],
+                      date: work.date
+                    });
+                  }
                 }
               }
             }
@@ -496,8 +531,14 @@ const AdminStudentRecords = () => {
             }
             studentUniquePages.get(rec.student_id)!.add(rec.page_number);
             
-            // تتبع آخر صفحة للتمهيديين
-            studentLastPages.set(rec.student_id, `صفحة ${rec.page_number}`);
+            // تتبع آخر صفحة للتمهيديين مع التاريخ
+            const currentLastPage = studentLastPages.get(rec.student_id);
+            if (!currentLastPage || new Date(rec.date) >= new Date(currentLastPage.date)) {
+              studentLastPages.set(rec.student_id, {
+                page: rec.page_number.toString(),
+                date: rec.date
+              });
+            }
           }
         });
 
@@ -526,10 +567,10 @@ const AdminStudentRecords = () => {
         });
 
         // تحديث آخر صفحة
-        studentLastPages.forEach((page, studentId) => {
+        studentLastPages.forEach((pageData, studentId) => {
           const summary = studentMap.get(studentId);
           if (summary) {
-            summary.lastPage = page;
+            summary.lastPage = pageData.page;
           }
         });
 
@@ -579,7 +620,7 @@ const AdminStudentRecords = () => {
         // جلب بيانات الاختبارات
         const { data: examData, error: examError } = await supabase
           .from('student_exams')
-          .select('student_id, id')
+          .select('student_id, id, grade')
           .gte('exam_date', dateFilter)
           .in('student_id', Array.from(studentMap.keys()));
 
@@ -618,10 +659,10 @@ const AdminStudentRecords = () => {
           }
         });
 
-        // إضافة عدد الاختبارات
+        // إضافة عدد الاختبارات (استثناء الإعادات)
         examData?.forEach(exam => {
           const summary = studentMap.get(exam.student_id);
-          if (summary) {
+          if (summary && exam.grade !== 'إعادة') {
             summary.totalExams += 1;
           }
         });
@@ -812,10 +853,9 @@ const AdminStudentRecords = () => {
       // الغيابات
       const absenceCount = attendanceData?.filter(a => a.student_id === studentId).length || 0;
 
-      // الاختبارات (استثناء الإعادات بناءً على المحاولة والتقدير)
+      // الاختبارات (استثناء الإعادات بناءً على التقدير)
       const studentExams = examsData?.filter(e => 
         e.student_id === studentId && 
-        e.attempt_number === 1 && 
         e.grade !== 'إعادة'
       ) || [];
       const examsCount = studentExams.length;
@@ -969,7 +1009,8 @@ const AdminStudentRecords = () => {
       'مجموع الصفحات': record.totalPages,
       'الغيابات': record.absenceCount,
       'آخر صفحة': record.lastPage,
-      'عدد الاختبارات': record.examsCount,
+      'الاختبارات': record.examsInfo,
+      'التقييمات': record.examsGrades,
       'الإعادة': record.retakeCount,
       'متوسط السلوك': record.behaviorAverage,
       'المذاكرة الشهرية': record.monthlyReviewScore !== null ? `${record.monthlyReviewScore}/100` : '-',

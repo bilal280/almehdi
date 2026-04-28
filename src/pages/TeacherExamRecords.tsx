@@ -57,7 +57,39 @@ const TeacherExamRecords = () => {
       
       const teacher = JSON.parse(teacherData);
 
-      // جلب الاختبارات التي أجراها هذا المدرس (بناءً على teacher_name)
+      // جلب الحلقات التابعة للمعلم
+      const { data: circles, error: circlesError } = await supabase
+        .from('circles')
+        .select('id')
+        .eq('teacher_id', teacher.id);
+
+      if (circlesError) throw circlesError;
+
+      const circleIds = circles?.map(c => c.id) || [];
+
+      if (circleIds.length === 0) {
+        setExams([]);
+        setFilteredExams([]);
+        return;
+      }
+
+      // جلب الطلاب في حلقات المعلم
+      const { data: students, error: studentsError } = await supabase
+        .from('students')
+        .select('id')
+        .in('circle_id', circleIds);
+
+      if (studentsError) throw studentsError;
+
+      const studentIds = students?.map(s => s.id) || [];
+
+      if (studentIds.length === 0) {
+        setExams([]);
+        setFilteredExams([]);
+        return;
+      }
+
+      // جلب الاختبارات لطلاب المعلم فقط
       const { data, error } = await supabase
         .from('student_exams')
         .select(`
@@ -71,7 +103,7 @@ const TeacherExamRecords = () => {
             )
           )
         `)
-        .eq('teacher_name', teacher.name)
+        .in('student_id', studentIds)
         .order('exam_date', { ascending: false });
 
       if (error) throw error;

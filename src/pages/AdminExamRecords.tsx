@@ -239,9 +239,9 @@ const AdminExamRecords = () => {
     const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const firstDayStr = firstDayOfMonth.toISOString().split('T')[0];
 
-    // اختبارات الشهر الحالي (استثناء الإعادات)
+    // اختبارات الشهر الحالي (استثناء الإعادات بناءً على التقدير)
     const monthlyExams = exams.filter(exam => 
-      exam.exam_date >= firstDayStr && exam.attempt_number === 1
+      exam.exam_date >= firstDayStr && exam.grade !== 'إعادة'
     );
 
     // إحصائيات حسب الحلقة
@@ -316,7 +316,7 @@ const AdminExamRecords = () => {
               <div className="text-center">
                 <p className="text-sm text-blue-600 font-medium mb-2">اختبارات هذا الشهر</p>
                 <p className="text-4xl font-bold text-blue-700">{monthlyStats.totalThisMonth}</p>
-                <p className="text-xs text-blue-500 mt-1">(المحاولة الأولى فقط)</p>
+                <p className="text-xs text-blue-500 mt-1">(الاختبارات الناجحة فقط)</p>
               </div>
             </CardContent>
           </Card>

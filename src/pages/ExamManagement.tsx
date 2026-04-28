@@ -478,6 +478,19 @@ const ExamManagement = () => {
         return;
       }
 
+      // إضافة النقاط العامة للاختبار
+      const { addExamPoints, addExamRetakePenalty } = await import("@/lib/generalPointsManager");
+      const examName = tamhidiStage || tilawahSection || hifdSection || 'اختبار';
+      
+      if (grade === 'إعادة') {
+        // إذا كان التقدير "إعادة" - خصم نقاط في كل الأحوال
+        await addExamRetakePenalty(selectedStudentId, examDate, examName);
+      } else if (grade && grade !== 'إعادة') {
+        // إذا كان التقدير ناجحاً - إضافة نقاط التقدير
+        // ملاحظة: بونص الاختبار (2 نقطة) يُضاف تلقائياً في addExamPoints للاختبارات الناجحة
+        await addExamPoints(selectedStudentId, grade, examDate, examName);
+      }
+
       toast({
         title: "تم بنجاح",
         description: "تم حفظ نتيجة الاختبار بنجاح",

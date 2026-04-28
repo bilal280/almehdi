@@ -659,6 +659,16 @@ const QuickDataEntry = () => {
               }
 
               console.log(`[نجح الإدراج] الطالب: ${student.name}, عدد السجلات: ${insertedData?.length || 0}`);
+              
+              // إضافة خصم إعادة التسميع للصفحات التي تقديرها "إعادة"
+              const retakePages = validRecitations.filter(r => r.grade === 'إعادة');
+              if (retakePages.length > 0) {
+                const { addRecitationRetakePenalty } = await import("@/lib/generalPointsManager");
+                // خصم -5 لكل صفحة إعادة
+                for (const retake of retakePages) {
+                  await addRecitationRetakePenalty(student.id, today);
+                }
+              }
             }
 
             // حفظ السلوك والملاحظات
@@ -689,6 +699,12 @@ const QuickDataEntry = () => {
                   console.error('Error updating daily work:', updateError);
                   throw updateError;
                 }
+                
+                // إضافة نقاط الأدب اليومي
+                if (data.behaviorGrade) {
+                  const { addBehaviorPoints } = await import("@/lib/generalPointsManager");
+                  await addBehaviorPoints(student.id, data.behaviorGrade, today);
+                }
               } else {
                 const { error: insertError } = await supabase
                   .from('student_daily_work')
@@ -704,6 +720,12 @@ const QuickDataEntry = () => {
                 if (insertError) {
                   console.error('Error inserting daily work:', insertError);
                   throw insertError;
+                }
+                
+                // إضافة نقاط الأدب اليومي
+                if (data.behaviorGrade) {
+                  const { addBehaviorPoints } = await import("@/lib/generalPointsManager");
+                  await addBehaviorPoints(student.id, data.behaviorGrade, today);
                 }
               }
             }
@@ -898,6 +920,19 @@ const QuickDataEntry = () => {
               console.error('Error updating daily work:', updateError);
               throw updateError;
             }
+            
+            // إضافة خصم إعادة التسميع إذا كان التقدير "إعادة"
+            const lastGrade = allPageGrades[allPageGrades.length - 1];
+            if (lastGrade === 'إعادة') {
+              const { addRecitationRetakePenalty } = await import("@/lib/generalPointsManager");
+              await addRecitationRetakePenalty(student.id, today);
+            }
+            
+            // إضافة نقاط الأدب اليومي
+            if (data.behaviorGrade) {
+              const { addBehaviorPoints } = await import("@/lib/generalPointsManager");
+              await addBehaviorPoints(student.id, data.behaviorGrade, today);
+            }
           } else {
             // حفظ أرقام صفحات المراجعة
             const reviewPageNumbers = student.level === 'حافظ' && data.reviewPages ? 
@@ -923,6 +958,19 @@ const QuickDataEntry = () => {
             if (insertError) {
               console.error('Error inserting daily work:', insertError);
               throw insertError;
+            }
+            
+            // إضافة خصم إعادة التسميع إذا كان التقدير "إعادة"
+            const lastGrade = allPageGrades[allPageGrades.length - 1];
+            if (lastGrade === 'إعادة') {
+              const { addRecitationRetakePenalty } = await import("@/lib/generalPointsManager");
+              await addRecitationRetakePenalty(student.id, today);
+            }
+            
+            // إضافة نقاط الأدب اليومي
+            if (data.behaviorGrade) {
+              const { addBehaviorPoints } = await import("@/lib/generalPointsManager");
+              await addBehaviorPoints(student.id, data.behaviorGrade, today);
             }
           }
 

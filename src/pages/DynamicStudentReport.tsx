@@ -756,7 +756,8 @@ const DynamicStudentReport = () => {
       totalPages += beginnerData?.length || 0;
 
       const absenceCount = attendanceData?.length || 0;
-      const examsCount = examsData?.length || 0;
+      const studentExams = examsData?.filter(e => e.grade !== 'إعادة') || [];
+      const examsCount = studentExams.length;
       const retakeCount = examsData?.filter(e => e.attempt_number > 1).length || 0;
       const behaviorAverage = behaviorCount > 0 ? getBehaviorLabel(behaviorSum / behaviorCount) : "غير محدد";
       const totalPointsSum = pointsData?.reduce((sum, p) => sum + p.points, 0) || 0;
