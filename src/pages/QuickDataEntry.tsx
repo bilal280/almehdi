@@ -51,6 +51,7 @@ interface StudentData {
 const QuickDataEntry = () => {
   const [students, setStudents] = useState<Student[]>([]);
   const [studentData, setStudentData] = useState<Record<string, StudentData>>({});
+  const [lastPages, setLastPages] = useState<Record<string, string>>({}); // آخر صفحة لكل طالب
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [loadingTodayData, setLoadingTodayData] = useState(false);
@@ -149,6 +150,9 @@ const QuickDataEntry = () => {
 
       setStudentData(initialData);
       
+      // جلب آخر صفحة سمّعها كل طالب
+      fetchLastPages(activeStudents);
+      
       // إظهار رسالة إذا كانت هناك بيانات محفوظة
       if (savedData) {
         toast({
@@ -166,6 +170,52 @@ const QuickDataEntry = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  // دالة لجلب آخر صفحة سمّعها كل طالب
+  const fetchLastPages = async (students: Student[]) => {
+    try {
+      const lastPagesMap: Record<string, string> = {};
+      
+      for (const student of students) {
+        if (student.level === 'تمهيدي') {
+          // للطلاب التمهيديين - جلب آخر صفحة من student_beginner_recitations
+          const { data } = await supabase
+            .from('student_beginner_recitations')
+            .select('page_number')
+            .eq('student_id', student.id)
+            .order('date', { ascending: false })
+            .order('page_number', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          
+          if (data) {
+            lastPagesMap[student.id] = data.page_number.toString();
+          }
+        } else {
+          // للطلاب العاديين - جلب آخر صفحات من student_daily_work
+          const { data } = await supabase
+            .from('student_daily_work')
+            .select('new_recitation_page_numbers')
+            .eq('student_id', student.id)
+            .not('new_recitation_page_numbers', 'is', null)
+            .order('date', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          
+          if (data && data.new_recitation_page_numbers) {
+            // أخذ آخر رقم من الصفحات
+            const pages = data.new_recitation_page_numbers.split(',').map((p: string) => p.trim());
+            const lastPage = pages[pages.length - 1];
+            lastPagesMap[student.id] = lastPage;
+          }
+        }
+      }
+      
+      setLastPages(lastPagesMap);
+    } catch (error) {
+      console.error('Error fetching last pages:', error);
     }
   };
 
@@ -1246,7 +1296,7 @@ const QuickDataEntry = () => {
                                     <Input
                                       type="number"
                                       min="1"
-                                      placeholder="رقم"
+                                      placeholder={lastPages[student.id] ? `آخر صفحة: ${lastPages[student.id]}` : "رقم"}
                                       value={rec.pageNumber}
                                       onChange={(e) => updateBeginnerRecitation(student.id, index, 'pageNumber', e.target.value)}
                                       className="text-center h-9"
@@ -1355,7 +1405,7 @@ const QuickDataEntry = () => {
                                   <Label className="text-xs mb-1">أرقام الصفحات</Label>
                                   <Input
                                     type="text"
-                                    placeholder="201,202,203 أو 201-210"
+                                    placeholder={lastPages[student.id] ? `آخر صفحة: ${lastPages[student.id]}` : "201,202,203 أو 201-210"}
                                     value={rec.pageNumbers}
                                     onChange={(e) => updateRegularRecitation(student.id, index, 'pageNumbers', e.target.value)}
                                     onBlur={() => expandPageRanges(student.id, index)}
@@ -1545,7 +1595,7 @@ const QuickDataEntry = () => {
                                     <Input
                                       type="number"
                                       min="1"
-                                      placeholder="صفحة"
+                                      placeholder={lastPages[student.id] ? `آخر صفحة: ${lastPages[student.id]}` : "صفحة"}
                                       value={rec.pageNumber}
                                       onChange={(e) => updateBeginnerRecitation(student.id, index, 'pageNumber', e.target.value)}
                                       className="text-center w-20"
@@ -1646,7 +1696,7 @@ const QuickDataEntry = () => {
                                   <div key={index} className="flex gap-2 items-center">
                                     <Input
                                       type="text"
-                                      placeholder="201,202"
+                                      placeholder={lastPages[student.id] ? `آخر صفحة: ${lastPages[student.id]}` : "201,202"}
                                       value={rec.pageNumbers}
                                       onChange={(e) => updateRegularRecitation(student.id, index, 'pageNumbers', e.target.value)}
                                       className="flex-1"

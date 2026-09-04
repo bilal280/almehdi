@@ -49,6 +49,7 @@ const StudentManagement = () => {
   const [students, setStudents] = useState<Student[]>([]);
   const [circles, setCircles] = useState<Circle[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false); // حالة جديدة لمنع الضغط المتكرر
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [selectedCircle, setSelectedCircle] = useState<string>("all");
@@ -127,6 +128,9 @@ const StudentManagement = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // منع الضغط المتكرر
+    if (isSubmitting) return;
+    
     // Validate required fields
     if (!formData.name || !formData.age) {
       toast({
@@ -145,6 +149,8 @@ const StudentManagement = () => {
       });
       return;
     }
+    
+    setIsSubmitting(true); // تعطيل الزر
     
     try {
       if (editingStudent) {
@@ -208,6 +214,8 @@ const StudentManagement = () => {
         description: error?.message || "فشل في حفظ بيانات الطالب",
         variant: "destructive",
       });
+    } finally {
+      setIsSubmitting(false); // إعادة تفعيل الزر
     }
   };
 
@@ -281,6 +289,7 @@ const StudentManagement = () => {
       level: "تلاوة"
     });
     setEditingStudent(null);
+    setIsSubmitting(false); // إعادة تعيين حالة الإرسال
   };
 
   const handleExportAllStudents = async () => {
@@ -499,11 +508,23 @@ const StudentManagement = () => {
                     type="button"
                     variant="outline"
                     onClick={() => setIsAddDialogOpen(false)}
+                    disabled={isSubmitting}
                   >
                     إلغاء
                   </Button>
-                  <Button type="submit" className="bg-emerald-600 hover:bg-emerald-700">
-                    {editingStudent ? "تحديث" : "إضافة"}
+                  <Button 
+                    type="submit" 
+                    className="bg-emerald-600 hover:bg-emerald-700"
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <span className="ml-2">جاري الحفظ...</span>
+                        <span className="animate-spin">⏳</span>
+                      </>
+                    ) : (
+                      editingStudent ? "تحديث" : "إضافة"
+                    )}
                   </Button>
                 </div>
               </form>

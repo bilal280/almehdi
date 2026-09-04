@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600">
+  <defs>
+    <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#16637a"/>
+      <stop offset="55%" stop-color="#1e8ba8"/>
+      <stop offset="100%" stop-color="#0e4658"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="38%" r="65%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.14"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="800" height="600" fill="url(#g)"/>
+  <rect width="800" height="600" fill="url(#glow)"/>
+  <g stroke="#e9c65e" stroke-opacity="0.18" stroke-width="1.5">
+    <path d="M0 150 L800 150"/>
+    <path d="M0 450 L800 450"/>
+  </g>
+  <circle cx="400" cy="300" r="205" fill="none" stroke="#e9c65e" stroke-opacity="0.55" stroke-width="3"/>
+  <circle cx="400" cy="300" r="218" fill="none" stroke="#e9c65e" stroke-opacity="0.28" stroke-width="1.5"/>
+  <circle cx="400" cy="300" r="190" fill="none" stroke="#e9c65e" stroke-opacity="0.35" stroke-width="1" stroke-dasharray="4 8"/>
+  <g fill="#e9c65e" fill-opacity="0.16" stroke="#e9c65e" stroke-opacity="0.7" stroke-width="2.5">
+    <rect x="352" y="132" width="96" height="336" rx="12"/>
+    <rect x="352" y="132" width="96" height="336" rx="12" transform="rotate(45 400 300)"/>
+  </g>
+  <g fill="#e9c65e" fill-opacity="0.1" stroke="#e9c65e" stroke-opacity="0.4" stroke-width="1.5">
+    <rect x="332" y="112" width="136" height="376" rx="16"/>
+    <rect x="332" y="112" width="136" height="376" rx="16" transform="rotate(45 400 300)"/>
+  </g>
+  <circle cx="400" cy="300" r="36" fill="#e9c65e" fill-opacity="0.12" stroke="#e9c65e" stroke-opacity="0.85" stroke-width="3"/>
+  <g stroke="#e9c65e" stroke-opacity="0.4" fill="none" stroke-width="1.5">
+    <circle cx="70" cy="70" r="26"/>
+    <circle cx="730" cy="70" r="26"/>
+    <circle cx="70" cy="530" r="26"/>
+    <circle cx="730" cy="530" r="26"/>
+  </g>
+  <g fill="#e9c65e" fill-opacity="0.25">
+    <rect x="58" y="58" width="24" height="24" rx="4" transform="rotate(45 70 70)"/>
+    <rect x="718" y="58" width="24" height="24" rx="4" transform="rotate(45 730 70)"/>
+    <rect x="58" y="518" width="24" height="24" rx="4" transform="rotate(45 70 530)"/>
+    <rect x="718" y="518" width="24" height="24" rx="4" transform="rotate(45 730 530)"/>
+  </g>
+</svg>

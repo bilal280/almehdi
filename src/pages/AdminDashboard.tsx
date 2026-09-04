@@ -2,7 +2,9 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import AdminNavbar from "@/components/AdminNavbar";
 import ProtectedAdminRoute from "@/components/ProtectedAdminRoute";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import AdminCharts from "@/components/AdminCharts";
+import AdminTopCircles from "@/components/AdminTopCircles";
+import { Card, CardContent } from "@/components/ui/card";
 import { 
   Users, 
   UserCheck, 
@@ -11,15 +13,15 @@ import {
   FileText, 
   Award, 
   ClipboardList,
-  Settings,
-  ChevronRight
+  Settings
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 interface AdminPage {
   title: string;
   description: string;
-  icon: any;
+  icon: LucideIcon;
   path: string;
   color: string;
   bgGradient: string;
@@ -267,107 +269,11 @@ const AdminDashboard = () => {
             })}
           </div>
 
-          {/* Navigation Grid */}
-          <div className="mb-12">
-            <h3 className="text-2xl font-bold text-primary text-right mb-6">الانتقال السريع</h3>
-            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {adminPages.map((page, index) => (
-                <Card 
-                  key={page.path}
-                  onClick={() => handlePageClick(page.path)}
-                  className={`islamic-card cursor-pointer hover:shadow-xl hover:scale-105 transition-all duration-300 group ${
-                    index % 2 === 0 ? 'fade-in-up' : 'fade-in-right'
-                  }`}
-                  style={{ animationDelay: `${index * 0.1}s` }}
-                >
-                  <CardContent className="p-6">
-                    <div className={`bg-gradient-to-br ${page.bgGradient} rounded-lg p-4 mb-4 group-hover:scale-110 transition-transform duration-300`}>
-                      <page.icon className={`w-8 h-8 ${page.color} mx-auto`} />
-                    </div>
-                    
-                    <div className="text-center">
-                      <h3 className="text-lg font-bold text-foreground mb-2 group-hover:text-primary transition-colors">
-                        {page.title}
-                      </h3>
-                      <p className="text-muted-foreground text-sm mb-4 leading-relaxed min-h-[40px]">
-                        {page.description}
-                      </p>
-                      
-                      <div className="flex items-center justify-center text-primary group-hover:translate-x-1 transition-transform duration-300">
-                        <span className="text-sm font-medium ml-2">انتقال</span>
-                        <ChevronRight className="w-4 h-4" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </div>
+          {/* Charts Section */}
+          <AdminCharts />
 
-          {/* Additional Info Cards */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 fade-in-up">
-            <Card className="islamic-card">
-              <CardHeader>
-                <CardTitle className="text-right">الأنشطة الأخيرة</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4 text-right">
-                  <div className="border-r-4 border-emerald-500 pr-4 hover:bg-muted/50 p-2 rounded transition-colors">
-                    <p className="font-medium">تم إضافة طالب جديد</p>
-                    <p className="text-sm text-muted-foreground">أحمد محمد - حلقة المبتدئين</p>
-                    <p className="text-xs text-muted-foreground">منذ ساعتين</p>
-                  </div>
-                  <div className="border-r-4 border-blue-500 pr-4 hover:bg-muted/50 p-2 rounded transition-colors">
-                    <p className="font-medium">تم تحديث بيانات أستاذ</p>
-                    <p className="text-sm text-muted-foreground">الأستاذ محمد العلي</p>
-                    <p className="text-xs text-muted-foreground">منذ 3 ساعات</p>
-                  </div>
-                  <div className="border-r-4 border-purple-500 pr-4 hover:bg-muted/50 p-2 rounded transition-colors">
-                    <p className="font-medium">تم إنشاء حلقة جديدة</p>
-                    <p className="text-sm text-muted-foreground">حلقة المتقدمين - المجموعة الثانية</p>
-                    <p className="text-xs text-muted-foreground">أمس</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="islamic-card">
-              <CardHeader>
-                <CardTitle className="text-right">الإحصائيات الشهرية</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4 text-right">
-                  <div className="flex justify-between items-center hover:bg-muted/50 p-2 rounded transition-colors">
-                    <div className="w-32 bg-muted rounded-full h-2">
-                      <div className="bg-emerald-600 h-2 rounded-full transition-all duration-500" style={{ width: '85%' }}></div>
-                    </div>
-                    <div>
-                      <p className="font-medium">معدل الحضور</p>
-                      <p className="text-sm text-muted-foreground">85%</p>
-                    </div>
-                  </div>
-                  <div className="flex justify-between items-center hover:bg-muted/50 p-2 rounded transition-colors">
-                    <div className="w-32 bg-muted rounded-full h-2">
-                      <div className="bg-blue-600 h-2 rounded-full transition-all duration-500" style={{ width: '92%' }}></div>
-                    </div>
-                    <div>
-                      <p className="font-medium">إكمال المهام</p>
-                      <p className="text-sm text-muted-foreground">92%</p>
-                    </div>
-                  </div>
-                  <div className="flex justify-between items-center hover:bg-muted/50 p-2 rounded transition-colors">
-                    <div className="w-32 bg-muted rounded-full h-2">
-                      <div className="bg-purple-600 h-2 rounded-full transition-all duration-500" style={{ width: '78%' }}></div>
-                    </div>
-                    <div>
-                      <p className="font-medium">رضا الطلاب</p>
-                      <p className="text-sm text-muted-foreground">78%</p>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          {/* Top Circles Section */}
+          <AdminTopCircles />
         </div>
       </div>
     </ProtectedAdminRoute>

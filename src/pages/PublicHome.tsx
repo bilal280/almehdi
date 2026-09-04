@@ -1,66 +1,18 @@
 import { useNavigate } from "react-router-dom";
-import { BookOpen, Users, Award, Calendar, LogIn, Facebook, Send, MessageCircle, Phone, Moon, Sun, Sparkles, Search, X } from "lucide-react";
+import { BookOpen, Users, Award, Calendar, LogIn, Facebook, Send, MessageCircle, Phone, Sparkles, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { useEffect, useState, useRef } from "react";
+import { useState } from "react";
+import PublicLayout from "@/components/PublicLayout";
+import { useScrollReveal } from "@/hooks/useScrollReveal";
 
 const PublicHome = () => {
   const navigate = useNavigate();
-  const [theme, setTheme] = useState<"light" | "dark">("light");
-  const [visibleSections, setVisibleSections] = useState<Set<string>>(new Set());
   const [showStudentDialog, setShowStudentDialog] = useState(false);
   const [studentNumber, setStudentNumber] = useState("");
-  
-  const aboutRef = useRef<HTMLElement>(null);
-  const socialRef = useRef<HTMLElement>(null);
-  const statsRef = useRef<HTMLElement>(null);
-  const featuresRef = useRef<HTMLElement>(null);
-
-  useEffect(() => {
-    // Load theme from localStorage
-    const savedTheme = localStorage.getItem("theme") as "light" | "dark" | null;
-    if (savedTheme) {
-      setTheme(savedTheme);
-      document.documentElement.classList.toggle("dark", savedTheme === "dark");
-    } else {
-      // Default to light mode (not system preference)
-      setTheme("light");
-      document.documentElement.classList.remove("dark");
-    }
-
-    // Intersection Observer for scroll animations
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            setVisibleSections((prev) => new Set(prev).add(entry.target.id));
-          }
-        });
-      },
-      { threshold: 0.1, rootMargin: "0px 0px -100px 0px" }
-    );
-
-    const sections = [aboutRef, socialRef, statsRef, featuresRef];
-    sections.forEach((ref) => {
-      if (ref.current) observer.observe(ref.current);
-    });
-
-    return () => {
-      sections.forEach((ref) => {
-        if (ref.current) observer.unobserve(ref.current);
-      });
-    };
-  }, []);
-
-  const toggleTheme = () => {
-    const newTheme = theme === "dark" ? "light" : "dark";
-    setTheme(newTheme);
-    localStorage.setItem("theme", newTheme);
-    document.documentElement.classList.toggle("dark", newTheme === "dark");
-  };
+  const { isVisible, register } = useScrollReveal();
 
   const handleStudentSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -72,69 +24,36 @@ const PublicHome = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background islamic-pattern overflow-x-hidden">
-      {/* Animated Background Elements */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-20 right-10 w-72 h-72 bg-primary/5 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-20 left-10 w-96 h-96 bg-primary/5 rounded-full blur-3xl animate-pulse delay-1000"></div>
-      </div>
-
-      {/* Header */}
-      <header className="bg-card/90 backdrop-blur-md border-b shadow-lg sticky top-0 z-50 transition-all duration-300">
-        <div className="container mx-auto px-4 py-3 sm:py-4">
-          <div className="flex items-center justify-between gap-2 sm:gap-4">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={toggleTheme}
-              className="rounded-full hover:bg-primary/10 transition-all duration-300 hover:scale-110"
-            >
-              <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-              <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-              <span className="sr-only">تبديل الوضع</span>
-            </Button>
-            
-            <div className="flex items-center gap-2 sm:gap-3 animate-fade-in">
-              <img 
-                src="/institute-logo.png" 
-                alt="شعار المعهد" 
-                className="w-10 h-10 sm:w-12 sm:h-12 rounded-full border-2 border-primary shadow-lg hover:scale-110 transition-transform duration-300"
-              />
-              <div className="text-right">
-                <h1 className="text-lg sm:text-xl font-bold text-primary bg-gradient-to-r from-primary to-primary-light bg-clip-text text-transparent">
-                  معهد القرآن الكريم
-                </h1>
-                <p className="text-xs sm:text-sm text-muted-foreground">نظام إدارة الطلاب</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
-
+    <PublicLayout>
       {/* Hero Section */}
-      <section className="relative container mx-auto px-4 py-12 sm:py-20 text-center min-h-[85vh] flex flex-col justify-center">
+      <section className="relative container mx-auto px-4 pt-28 sm:pt-32 pb-12 sm:pb-20 text-center min-h-[85vh] flex flex-col justify-center">
         <div className="max-w-4xl mx-auto fade-in-up relative z-10">
           <div className="relative inline-block mb-6 sm:mb-8">
             <div className="absolute inset-0 bg-primary/20 rounded-full blur-2xl animate-pulse"></div>
-            <img 
-              src="/institute-logo.png" 
-              alt="شعار المعهد" 
+            <img
+              src="/institute-logo.png"
+              alt="شعار المعهد"
               className="relative w-24 h-24 sm:w-32 sm:h-32 rounded-full border-4 border-primary shadow-2xl hover:scale-110 transition-transform duration-500 animate-float"
             />
           </div>
-          
+
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-semibold mb-5 border border-primary/20">
+            <Sparkles className="w-4 h-4" />
+            مؤسسة تعليمية قرآنية رائدة
+          </div>
+
           <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-4 sm:mb-6 leading-tight">
             <span className="bg-gradient-to-r from-primary via-primary-light to-primary bg-clip-text text-transparent animate-gradient">
               مرحباً بكم في معهد القرآن الكريم
             </span>
           </h2>
-          
+
           <p className="text-base sm:text-lg md:text-xl text-muted-foreground mb-8 sm:mb-12 leading-relaxed px-4 max-w-3xl mx-auto">
             نظام متكامل لإدارة ومتابعة تقدم الطلاب في حفظ القرآن الكريم والأحاديث النبوية الشريفة
           </p>
-          
+
           <div className="flex gap-3 sm:gap-4 justify-center flex-wrap px-4">
-            <Button 
+            <Button
               size="lg"
               onClick={() => navigate("/login")}
               className="group relative bg-gradient-to-r from-primary to-primary-light hover:from-primary-dark hover:to-primary text-primary-foreground shadow-xl hover:shadow-2xl transition-all duration-300 w-full sm:w-auto text-base sm:text-lg h-12 sm:h-14 overflow-hidden"
@@ -143,8 +62,8 @@ const PublicHome = () => {
               <LogIn className="w-5 h-5 ml-2 relative z-10 group-hover:scale-110 transition-transform" />
               <span className="relative z-10">دخول الأساتذة</span>
             </Button>
-            
-            <Button 
+
+            <Button
               size="lg"
               variant="outline"
               onClick={() => setShowStudentDialog(true)}
@@ -158,11 +77,11 @@ const PublicHome = () => {
       </section>
 
       {/* About Section */}
-      <section 
-        ref={aboutRef}
+      <section
+        ref={register("about")}
         id="about"
         className={`relative container mx-auto px-4 py-12 sm:py-16 transition-all duration-1000 ${
-          visibleSections.has('about') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+          isVisible("about") ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"
         }`}
       >
         <div className="max-w-4xl mx-auto">
@@ -174,29 +93,38 @@ const PublicHome = () => {
           </h3>
           <div className="bg-gradient-to-br from-card/80 to-card/50 backdrop-blur-sm rounded-2xl p-6 sm:p-8 shadow-xl border border-primary/10 hover:shadow-2xl transition-all duration-500 hover:scale-[1.02]">
             <p className="text-base sm:text-lg text-muted-foreground leading-relaxed mb-4 sm:mb-6 text-justify">
-              معهد القرآن الكريم هو مؤسسة تعليمية إسلامية متخصصة في تحفيظ القرآن الكريم والأحاديث النبوية الشريفة، 
-              تأسس المعهد بهدف نشر العلم الشرعي وتعليم كتاب الله عز وجل للأجيال الناشئة. نسعى لتقديم تعليم متميز 
+              معهد القرآن الكريم هو مؤسسة تعليمية إسلامية متخصصة في تحفيظ القرآن الكريم والأحاديث النبوية الشريفة،
+              تأسس المعهد بهدف نشر العلم الشرعي وتعليم كتاب الله عز وجل للأجيال الناشئة. نسعى لتقديم تعليم متميز
               يجمع بين الأصالة والمعاصرة، حيث نحرص على تطبيق أفضل الأساليب التربوية في التحفيظ والتعليم.
             </p>
             <p className="text-base sm:text-lg text-muted-foreground leading-relaxed mb-4 sm:mb-6 text-justify">
-              يضم المعهد نخبة من الأساتذة والمعلمين المتخصصين في علوم القرآن والتجويد، ويوفر بيئة تعليمية محفزة 
-              تساعد الطلاب على الحفظ والفهم والتدبر. كما نهتم بالجانب التربوي والسلوكي للطلاب من خلال برامج 
+              يضم المعهد نخبة من الأساتذة والمعلمين المتخصصين في علوم القرآن والتجويد، ويوفر بيئة تعليمية محفزة
+              تساعد الطلاب على الحفظ والفهم والتدبر. كما نهتم بالجانب التربوي والسلوكي للطلاب من خلال برامج
               متنوعة تعزز القيم الإسلامية والأخلاق الحميدة.
             </p>
             <p className="text-base sm:text-lg text-muted-foreground leading-relaxed text-justify">
-              نستخدم أحدث التقنيات والأنظمة الإلكترونية لمتابعة تقدم الطلاب وتسهيل التواصل مع أولياء الأمور، 
+              نستخدم أحدث التقنيات والأنظمة الإلكترونية لمتابعة تقدم الطلاب وتسهيل التواصل مع أولياء الأمور،
               مما يضمن متابعة دقيقة ومستمرة لمسيرة كل طالب في حفظ كتاب الله تعالى.
             </p>
+            <div className="mt-6 flex flex-wrap gap-3 justify-center">
+              <Button
+                onClick={() => navigate("/about")}
+                className="group bg-gradient-to-r from-primary to-primary-light hover:from-primary-dark hover:to-primary text-primary-foreground shadow-lg hover:shadow-xl transition-all"
+              >
+                تعرف على المعهد أكثر
+                <Sparkles className="w-4 h-4 mr-2 group-hover:scale-110 transition-transform" />
+              </Button>
+            </div>
           </div>
         </div>
       </section>
 
       {/* Social Media & Contact Section */}
-      <section 
-        ref={socialRef}
-        id="social"
+      <section
+        ref={register("contact")}
+        id="contact"
         className={`relative container mx-auto px-4 py-12 sm:py-16 bg-gradient-to-b from-card/20 to-transparent transition-all duration-1000 delay-200 ${
-          visibleSections.has('social') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+          isVisible("contact") ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"
         }`}
       >
         <div className="max-w-4xl mx-auto">
@@ -207,9 +135,9 @@ const PublicHome = () => {
             </span>
           </h3>
           <div className="grid sm:grid-cols-2 gap-4 sm:gap-6">
-            <a 
-              href="https://facebook.com/your-institute" 
-              target="_blank" 
+            <a
+              href="https://facebook.com/your-institute"
+              target="_blank"
               rel="noopener noreferrer"
               className="group flex items-center gap-4 p-4 sm:p-6 bg-gradient-to-br from-card to-card/80 backdrop-blur-sm rounded-xl shadow-lg hover:shadow-2xl transition-all duration-300 hover:scale-105 border border-transparent hover:border-blue-500/20"
             >
@@ -222,9 +150,9 @@ const PublicHome = () => {
               </div>
             </a>
 
-            <a 
-              href="https://wa.me/channel/your-channel" 
-              target="_blank" 
+            <a
+              href="https://wa.me/channel/your-channel"
+              target="_blank"
               rel="noopener noreferrer"
               className="group flex items-center gap-4 p-4 sm:p-6 bg-gradient-to-br from-card to-card/80 backdrop-blur-sm rounded-xl shadow-lg hover:shadow-2xl transition-all duration-300 hover:scale-105 border border-transparent hover:border-green-500/20"
             >
@@ -237,9 +165,9 @@ const PublicHome = () => {
               </div>
             </a>
 
-            <a 
-              href="https://t.me/your-channel" 
-              target="_blank" 
+            <a
+              href="https://t.me/your-channel"
+              target="_blank"
               rel="noopener noreferrer"
               className="group flex items-center gap-4 p-4 sm:p-6 bg-gradient-to-br from-card to-card/80 backdrop-blur-sm rounded-xl shadow-lg hover:shadow-2xl transition-all duration-300 hover:scale-105 border border-transparent hover:border-blue-400/20"
             >
@@ -247,14 +175,14 @@ const PublicHome = () => {
                 <Send className="w-6 h-6 sm:w-7 sm:h-7 text-blue-400 group-hover:animate-pulse" />
               </div>
               <div className="text-right flex-1">
-                <h4 className="font-bold text-base sm:text-lg mb-1 group-hover:text-blue-400 transition-colors">قناة التلجرام</h4>
+                <h4 className="font-bold text-base sm:text-lg mb-1 group-hover:text-blue-400 transition-colors">قناة التلغرام</h4>
                 <p className="text-xs sm:text-sm text-muted-foreground">تابع آخر الأخبار</p>
               </div>
             </a>
 
-            <a 
-              href="https://wa.me/9647XXXXXXXXX" 
-              target="_blank" 
+            <a
+              href="https://wa.me/9647XXXXXXXXX"
+              target="_blank"
               rel="noopener noreferrer"
               className="group flex items-center gap-4 p-4 sm:p-6 bg-gradient-to-br from-card to-card/80 backdrop-blur-sm rounded-xl shadow-lg hover:shadow-2xl transition-all duration-300 hover:scale-105 border border-transparent hover:border-green-600/20"
             >
@@ -271,11 +199,11 @@ const PublicHome = () => {
       </section>
 
       {/* Statistics Section */}
-      <section 
-        ref={statsRef}
+      <section
+        ref={register("stats")}
         id="stats"
         className={`relative container mx-auto px-4 py-12 sm:py-16 transition-all duration-1000 delay-300 ${
-          visibleSections.has('stats') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+          isVisible("stats") ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"
         }`}
       >
         <h3 className="text-2xl sm:text-3xl font-bold text-center text-primary mb-8 sm:mb-12 relative inline-block w-full">
@@ -307,11 +235,11 @@ const PublicHome = () => {
       </section>
 
       {/* System Features Section */}
-      <section 
-        ref={featuresRef}
+      <section
+        ref={register("features")}
         id="features"
         className={`relative container mx-auto px-4 py-12 sm:py-16 bg-gradient-to-b from-card/20 to-transparent transition-all duration-1000 delay-500 ${
-          visibleSections.has('features') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+          isVisible("features") ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"
         }`}
       >
         <h3 className="text-2xl sm:text-3xl font-bold text-center text-primary mb-8 sm:mb-12 relative inline-block w-full">
@@ -322,7 +250,7 @@ const PublicHome = () => {
         </h3>
         <div className="max-w-4xl mx-auto mb-8 sm:mb-12">
           <p className="text-base sm:text-lg text-muted-foreground leading-relaxed text-center mb-6 sm:mb-8 px-4">
-            نظام إلكتروني متطور لإدارة ومتابعة الطلاب، يوفر أدوات متقدمة للأساتذة والإدارة لتسجيل 
+            نظام إلكتروني متطور لإدارة ومتابعة الطلاب، يوفر أدوات متقدمة للأساتذة والإدارة لتسجيل
             ومتابعة حفظ الطلاب، وللطلاب وأولياء الأمور لمتابعة التقدم والإنجازات بشكل لحظي.
           </p>
         </div>
@@ -401,18 +329,6 @@ const PublicHome = () => {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="relative bg-gradient-to-t from-card/90 to-card/80 backdrop-blur-md border-t border-primary/10">
-        <div className="container mx-auto px-4 py-6 sm:py-8 text-center">
-          <p className="text-sm sm:text-base text-muted-foreground">
-            © 2024 معهد القرآن الكريم - جميع الحقوق محفوظة
-          </p>
-          <p className="text-xs sm:text-sm text-muted-foreground mt-2">
-            نظام إدارة الطلاب - الإصدار 1.0
-          </p>
-        </div>
-      </footer>
-
       {/* Student Number Dialog */}
       <Dialog open={showStudentDialog} onOpenChange={setShowStudentDialog}>
         <DialogContent className="sm:max-w-md bg-gradient-to-br from-card to-card/95 backdrop-blur-xl border-2 border-primary/20">
@@ -424,7 +340,7 @@ const PublicHome = () => {
               أدخل رقم الطالب للوصول إلى تقريره الشامل
             </DialogDescription>
           </DialogHeader>
-          
+
           <form onSubmit={handleStudentSearch} className="space-y-6 mt-4">
             <div className="space-y-3">
               <Label htmlFor="studentNumber" className="text-right block text-foreground font-semibold text-lg">
@@ -470,7 +386,7 @@ const PublicHome = () => {
           </form>
         </DialogContent>
       </Dialog>
-    </div>
+    </PublicLayout>
   );
 };
 

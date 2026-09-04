@@ -5,11 +5,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Award, Download, RotateCcw } from "lucide-react";
+import { Award, Download } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { exportToExcel } from "@/lib/exportToExcel";
-import { resetStudentPoints } from "@/lib/generalPointsManager";
 
 interface PointRecord {
   id: string;
@@ -32,7 +31,6 @@ const AdminPointsRecords = () => {
   const [circles, setCircles] = useState<Circle[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCircle, setSelectedCircle] = useState<string>("all");
-  const [resettingStudent, setResettingStudent] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -89,13 +87,7 @@ const AdminPointsRecords = () => {
 
       if (pointsError) throw pointsError;
 
-      // جلب النقاط العامة لكل طالب
-      const { data: generalPointsData } = await supabase
-        .from('student_general_points_summary')
-        .select('*')
-        .in('student_id', activeStudents.map(s => s.id));
-
-      // حساب إجمالي نقاط الحماسة والنقاط العامة لكل طالب
+      // حساب إجمالي نقاط الحماسة لكل طالب
       const studentPointsMap = new Map();
       activeStudents.forEach(student => {
         studentPointsMap.set(student.id, {
@@ -105,7 +97,7 @@ const AdminPointsRecords = () => {
           circle_name: student.circles?.name || "غير محدد",
           circle_id: student.circle_id,
           enthusiasm_points: 0,
-          general_points: 0,
+          general_points: 0, // معطل مؤقتاً
           total_points: 0
         });
       });
@@ -117,26 +109,9 @@ const AdminPointsRecords = () => {
         }
       });
 
-      generalPointsData?.forEach(summary => {
-        const student = studentPointsMap.get(summary.student_id);
-        if (student) {
-          student.general_points = summary.total_points;
-        }
-      });
-
-      // حساب المجموع الكلي مع نقاط الحماسة التراكمية
+      // نقاط الحماسة = عدد الأيام فقط (بدون حساب تراكمي)
       studentPointsMap.forEach(student => {
-        // حساب نقاط الحماسة التراكمية
-        // كل 5 أيام = milestone يعطي نقاط = رقمه
-        // مثال: 20 يوم = 5 + 10 + 15 + 20 = 50 نقطة
-        const milestones = Math.floor(student.enthusiasm_points / 5);
-        let cumulativeEnthusiasmPoints = 0;
-        for (let i = 1; i <= milestones; i++) {
-          cumulativeEnthusiasmPoints += (i * 5);
-        }
-        
-        student.enthusiasm_points = cumulativeEnthusiasmPoints;
-        student.total_points = student.enthusiasm_points + student.general_points;
+        student.total_points = student.enthusiasm_points;
       });
 
       // تحويل إلى مصفوفة وترتيب من الأعلى إلى الأدنى حسب المجموع الكلي
@@ -178,47 +153,15 @@ const AdminPointsRecords = () => {
       'اسم الطالب': record.student_name,
       'الحلقة': record.circle_name,
       'نقاط الحماسة': record.enthusiasm_points,
-      'النقاط العامة': record.general_points,
-      'المجموع الكلي': record.total_points,
     }));
 
     const circleName = selectedCircle === "all" ? 'جميع_الحلقات' : circles.find(c => c.id === selectedCircle)?.name || 'حلقة';
-    exportToExcel(exportData, `نقاط_الطلاب_${circleName}_${new Date().toLocaleDateString('ar-SA')}`, 'نقاط_الطلاب');
+    exportToExcel(exportData, `نقاط_الحماسة_${circleName}_${new Date().toLocaleDateString('ar-SA')}`, 'نقاط_الحماسة');
     
     toast({
       title: "تم التصدير بنجاح",
-      description: "تم تصدير نقاط الطلاب إلى ملف Excel",
+      description: "تم تصدير نقاط الحماسة إلى ملف Excel",
     });
-  };
-
-  const handleResetStudentPoints = async (studentId: string, studentName: string) => {
-    if (!confirm(`هل أنت متأكد من تصفير النقاط العامة للطالب ${studentName}؟\n\nملاحظة: نقاط الحماسة لن تتأثر`)) {
-      return;
-    }
-
-    try {
-      setResettingStudent(studentId);
-      const result = await resetStudentPoints(studentId);
-      
-      if (result.success) {
-        toast({
-          title: "تم التصفير بنجاح",
-          description: `تم تصفير النقاط العامة للطالب ${studentName}`,
-        });
-        await fetchPointRecords();
-      } else {
-        throw new Error('فشل في تصفير النقاط');
-      }
-    } catch (error) {
-      console.error('Error resetting points:', error);
-      toast({
-        title: "خطأ",
-        description: "فشل في تصفير النقاط",
-        variant: "destructive",
-      });
-    } finally {
-      setResettingStudent(null);
-    }
   };
 
   return (
@@ -230,13 +173,16 @@ const AdminPointsRecords = () => {
           سجلات النقاط
         </h2>
 
-        {/* قسم الترتيب الكلي - في الأعلى */}
-        <Card className="mb-8">
+        {/* قسم المكافآت - في البداية */}
+        <RewardsSection />
+
+        {/* قسم ترتيب نقاط الحماسة */}
+        <Card className="mt-8">
           <CardHeader>
             <div className="flex justify-between items-center flex-wrap gap-4">
               <CardTitle className="text-right flex items-center gap-3">
                 <Award className="w-6 h-6 text-blue-600" />
-                ترتيب الطلاب - جميع النقاط
+                ترتيب الطلاب - نقاط الحماسة
               </CardTitle>
               <div className="flex gap-4 items-center flex-wrap">
                 {!loading && filteredRecords.length > 0 && (
@@ -271,21 +217,18 @@ const AdminPointsRecords = () => {
                     <TableHead className="text-right font-bold">اسم الطالب</TableHead>
                     <TableHead className="text-right font-bold">الحلقة</TableHead>
                     <TableHead className="text-center font-bold">نقاط الحماسة</TableHead>
-                    <TableHead className="text-center font-bold">النقاط العامة</TableHead>
-                    <TableHead className="text-center font-bold">المجموع الكلي</TableHead>
-                    <TableHead className="text-center font-bold">الإجراءات</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {loading ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                         جاري تحميل السجلات...
                       </TableCell>
                     </TableRow>
                   ) : filteredRecords.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                         لا توجد سجلات نقاط
                       </TableCell>
                     </TableRow>
@@ -312,44 +255,9 @@ const AdminPointsRecords = () => {
                           {record.circle_name}
                         </TableCell>
                         <TableCell className="text-center">
-                          <span className="inline-flex items-center justify-center px-3 py-1 rounded-full bg-blue-100 text-blue-700 font-bold">
+                          <span className="inline-flex items-center justify-center px-4 py-2 rounded-full bg-primary text-white font-bold text-lg">
                             {record.enthusiasm_points}
                           </span>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <span className={`inline-flex items-center justify-center px-3 py-1 rounded-full font-bold ${
-                            record.general_points > 0 ? 'bg-green-100 text-green-700' :
-                            record.general_points < 0 ? 'bg-red-100 text-red-700' :
-                            'bg-gray-100 text-gray-700'
-                          }`}>
-                            {record.general_points}
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <span className="inline-flex items-center justify-center px-4 py-2 rounded-full bg-primary text-white font-bold text-lg">
-                            {record.total_points}
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleResetStudentPoints(record.id, record.student_name)}
-                            disabled={resettingStudent === record.id || record.general_points === 0}
-                            className="gap-2"
-                          >
-                            {resettingStudent === record.id ? (
-                              <>
-                                <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-primary"></div>
-                                جاري...
-                              </>
-                            ) : (
-                              <>
-                                <RotateCcw className="w-3 h-3" />
-                                تصفير
-                              </>
-                            )}
-                          </Button>
                         </TableCell>
                       </TableRow>
                     ))
@@ -359,9 +267,6 @@ const AdminPointsRecords = () => {
             </div>
           </CardContent>
         </Card>
-
-        {/* قسم المكافآت */}
-        <RewardsSection />
       </div>
     </div>
   );

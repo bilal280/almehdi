@@ -416,13 +416,68 @@ const StudentRecords = () => {
       }
     });
 
-    // تحديث آخر صفحة
+    // تحديث آخر صفحة من الفترة المحددة
     studentLastPages.forEach((pageData, studentId) => {
       const summary = studentMap.get(studentId);
       if (summary) {
         summary.lastPage = pageData.page;
       }
     });
+
+    // جلب آخر صفحة لكل طالب من قاعدة البيانات بالكامل (للطلاب الذين ليس لديهم صفحة في الفترة المحددة)
+    const studentsWithoutLastPage = Array.from(studentMap.keys()).filter(
+      studentId => !studentLastPages.has(studentId)
+    );
+
+    if (studentsWithoutLastPage.length > 0) {
+      // جلب آخر عمل يومي لكل طالب
+      const { data: allTimeWorkData } = await supabase
+        .from('student_daily_work')
+        .select('student_id, new_recitation_page_numbers, date')
+        .in('student_id', studentsWithoutLastPage)
+        .not('new_recitation_page_numbers', 'is', null)
+        .order('date', { ascending: false });
+
+      // جلب آخر تسميع تمهيدي لكل طالب
+      const { data: allTimeBeginnerData } = await supabase
+        .from('student_beginner_recitations')
+        .select('student_id, page_number, date')
+        .in('student_id', studentsWithoutLastPage)
+        .order('date', { ascending: false });
+
+      // معالجة البيانات لإيجاد آخر صفحة لكل طالب
+      const studentLastPageMap = new Map<string, {page: string, date: string}>();
+
+      allTimeWorkData?.forEach(work => {
+        if (!studentLastPageMap.has(work.student_id) && work.new_recitation_page_numbers) {
+          const pageNumbers = work.new_recitation_page_numbers.split(',').map((p: string) => p.trim()).filter((p: string) => p);
+          if (pageNumbers.length > 0) {
+            studentLastPageMap.set(work.student_id, {
+              page: pageNumbers[pageNumbers.length - 1],
+              date: work.date
+            });
+          }
+        }
+      });
+
+      allTimeBeginnerData?.forEach(rec => {
+        const existing = studentLastPageMap.get(rec.student_id);
+        if (!existing || new Date(rec.date) > new Date(existing.date)) {
+          studentLastPageMap.set(rec.student_id, {
+            page: `صفحة ${rec.page_number}`,
+            date: rec.date
+          });
+        }
+      });
+
+      // تحديث آخر صفحة للطلاب
+      studentLastPageMap.forEach((pageData, studentId) => {
+        const summary = studentMap.get(studentId);
+        if (summary) {
+          summary.lastPage = pageData.page;
+        }
+      });
+    }
 
     // حساب نقاط الترتيب (الصفحات + الاختبارات × 2)
     const records = Array.from(studentMap.values());
@@ -603,13 +658,68 @@ const StudentRecords = () => {
       }
     });
 
-    // تحديث آخر صفحة
+    // تحديث آخر صفحة من الفترة المحددة
     studentLastPages.forEach((pageData, studentId) => {
       const summary = studentMap.get(studentId);
       if (summary) {
         summary.lastPage = pageData.page;
       }
     });
+
+    // جلب آخر صفحة لكل طالب من قاعدة البيانات بالكامل (للطلاب الذين ليس لديهم صفحة في الفترة المحددة)
+    const studentsWithoutLastPage = Array.from(studentMap.keys()).filter(
+      studentId => !studentLastPages.has(studentId)
+    );
+
+    if (studentsWithoutLastPage.length > 0) {
+      // جلب آخر عمل يومي لكل طالب
+      const { data: allTimeWorkData } = await supabase
+        .from('student_daily_work')
+        .select('student_id, new_recitation_page_numbers, date')
+        .in('student_id', studentsWithoutLastPage)
+        .not('new_recitation_page_numbers', 'is', null)
+        .order('date', { ascending: false });
+
+      // جلب آخر تسميع تمهيدي لكل طالب
+      const { data: allTimeBeginnerData } = await supabase
+        .from('student_beginner_recitations')
+        .select('student_id, page_number, date')
+        .in('student_id', studentsWithoutLastPage)
+        .order('date', { ascending: false });
+
+      // معالجة البيانات لإيجاد آخر صفحة لكل طالب
+      const studentLastPageMap = new Map<string, {page: string, date: string}>();
+
+      allTimeWorkData?.forEach(work => {
+        if (!studentLastPageMap.has(work.student_id) && work.new_recitation_page_numbers) {
+          const pageNumbers = work.new_recitation_page_numbers.split(',').map((p: string) => p.trim()).filter((p: string) => p);
+          if (pageNumbers.length > 0) {
+            studentLastPageMap.set(work.student_id, {
+              page: pageNumbers[pageNumbers.length - 1],
+              date: work.date
+            });
+          }
+        }
+      });
+
+      allTimeBeginnerData?.forEach(rec => {
+        const existing = studentLastPageMap.get(rec.student_id);
+        if (!existing || new Date(rec.date) > new Date(existing.date)) {
+          studentLastPageMap.set(rec.student_id, {
+            page: `صفحة ${rec.page_number}`,
+            date: rec.date
+          });
+        }
+      });
+
+      // تحديث آخر صفحة للطلاب
+      studentLastPageMap.forEach((pageData, studentId) => {
+        const summary = studentMap.get(studentId);
+        if (summary) {
+          summary.lastPage = pageData.page;
+        }
+      });
+    }
 
     // حساب نقاط الترتيب (الصفحات + الاختبارات × 2)
     const recordsArray = Array.from(studentMap.values());

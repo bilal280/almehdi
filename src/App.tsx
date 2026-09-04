@@ -12,6 +12,10 @@ import TeacherExamRecords from "./pages/TeacherExamRecords";
 
 import Login from "./pages/Login";
 import PublicHome from "./pages/PublicHome";
+import About from "./pages/About";
+import Gallery from "./pages/Gallery";
+import Programs from "./pages/Programs";
+import News from "./pages/News";
 import CircleActivities from "./pages/CircleActivities";
 import StudentRecords from "./pages/StudentRecords";
 import AdminLogin from "./pages/AdminLogin";
@@ -42,6 +46,10 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<PublicHome />} />
+          <Route path="/about" element={<About />} />
+          <Route path="/gallery" element={<Gallery />} />
+          <Route path="/programs" element={<Programs />} />
+          <Route path="/news" element={<News />} />
           <Route path="/login" element={<Login />} />
           
           {/* صفحة الصيانة */}
